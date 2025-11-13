@@ -1,0 +1,269 @@
+###############################################
+# MediPredict .gitignore
+# Comprehensive ignore for ML artifacts, envs,
+# build outputs, caches, and OS/IDE files.
+###############################################
+
+# ============================================
+# Dependencies
+# ============================================
+node_modules/
+server/node_modules/
+.pnp
+.pnp.js
+
+# ============================================
+# Next.js
+# ============================================
+.next/
+out/
+.turbo/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+
+# ============================================
+# Build & Distribution
+# ============================================
+dist/
+build/
+server/dist/
+server/build/
+*.tsbuildinfo
+
+# ============================================
+# Environment Variables (CRITICAL - Never commit!)
+# ============================================
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+.env.*.local
+.env.*.backup
+server/.env
+server/.env.*
+ml/.env
+ml/.env.*
+*.env
+
+# ============================================
+# Python
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Python Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Python Testing & Coverage
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+
+# Python Type Checking
+.pytype/
+.pyre/
+
+# ============================================
+# Machine Learning Artifacts
+# ============================================
+# Trained models (too large for git)
+ml/models/*.pkl
+ml/models/*.joblib
+ml/models/*.h5
+ml/models/*.ckpt
+ml/models/*.pt
+ml/models/*.onnx
+ml/models/*.tflite
+ml/models/*.sav
+ml/models/*.npz
+*.pkl
+*.joblib
+*.h5
+*.ckpt
+*.pt
+*.onnx
+*.tflite
+*.sav
+*.npz
+
+# ML Experiment Tracking
+mlruns/
+wandb/
+.neptune/
+tensorboard_logs/
+lightning_logs/
+
+# ML Cache & Temporary Files
+ml/**/cache/
+ml/**/tmp/
+ml/**/.cache/
+ml/*.log
+ml/**/*.log
+
+# ============================================
+# Data Files (Large datasets - use Git LFS if needed)
+# ============================================
+data/
+data/raw/
+data/processed/
+ml/data/*.csv
+ml/data/*.tsv
+ml/data/*.parquet
+ml/data/*.xlsx
+ml/data/*.json
+*.csv
+*.tsv
+*.parquet
+*.xlsx
+*.hdf5
+*.h5
+
+# ============================================
+# Logs
+# ============================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+*.out
+*.err
+pnpm-debug.log*
+
+# ============================================
+# Testing
+# ============================================
+coverage/
+.nyc_output/
+*.lcov
+.jest/
+
+# ============================================
+# IDE & Editor
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+
+# ============================================
+# OS Files
+# ============================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ============================================
+# API Keys & Credentials (CRITICAL!)
+# ============================================
+.kaggle/
+kaggle.json
+*.key
+*.pem
+*.p12
+*.pfx
+credentials.json
+service-account*.json
+
+# ============================================
+# Jupyter Notebooks
+# ============================================
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# ============================================
+# Database
+# ============================================
+data/db/
+mongodb-data/
+*.db
+*.sqlite
+*.sqlite3
+
+# ============================================
+# Temporary Files
+# ============================================
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.backup
+*.swp
+*.swo
+*~
+
+# ============================================
+# Package Manager Locks
+# ============================================
+# Uncomment if you want to ignore lock files
+# (Some teams prefer to commit these for consistency)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# ============================================
+# Misc
+# ============================================
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+.sass-cache/
+connect.lock
+typings/
+.npm
+.eslintcache
+.yarn-integrity
+yarn-error.log

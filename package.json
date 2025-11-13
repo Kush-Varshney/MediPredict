@@ -1,0 +1,29 @@
+{
+  "name": "medipredict",
+  "version": "1.0.0",
+  "description": "Smart AI-Powered Disease Prediction and Guidance System",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "server": "npm --prefix server start",
+    "test": "echo 'No tests configured yet. Add Jest/Vitest to enable npm test.' && exit 0"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.11.3",
+    "next": "^14.2.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.39",
+    "tailwindcss": "^3.4.10",
+    "typescript": "^5.6.2",
+    "@types/node": "^20.11.30",
+    "@types/react": "^18.2.66",
+    "@types/react-dom": "^18.2.22"
+  }
+}
