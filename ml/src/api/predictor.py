@@ -61,7 +61,17 @@ class DiseasePredictor:
                 s = str(s).lower().strip()
                 s = _re.sub(r"[\s_]+", " ", s)
                 s = _re.sub(r"[^a-z0-9 ]+", "", s)
-                return s
+                
+                # Common mappings
+                mappings = {
+                    "runny nose": "nasal congestion",
+                    "stuffy nose": "nasal congestion",
+                    "pain in joints": "joint pain",
+                    "pain in muscles": "muscle pain",
+                    "feeling tired": "fatigue",
+                    "feeling weak": "weakness",
+                }
+                return mappings.get(s, s)
 
             def _variants(base: str):
                 # simple variants generator; can be extended

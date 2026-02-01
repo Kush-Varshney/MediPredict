@@ -207,6 +207,6 @@ def method_not_allowed(error):
     return jsonify({'error': 'Method not allowed', 'type': 'method_not_allowed'}), 405
 
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 5000))
+    port = int(os.getenv('PORT', 5001))
     debug = os.getenv('FLASK_ENV', 'production') == 'development'
     app.run(debug=debug, host='0.0.0.0', port=port)

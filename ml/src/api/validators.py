@@ -17,7 +17,18 @@ def normalize_symptom(symptom_str: str) -> str:
     # Remove extra spaces and punctuation
     s = re.sub(r"[\s_]+", " ", s)
     s = re.sub(r"[^a-z0-9 ]+", "", s)
-    return s.strip()
+    s = s.strip()
+    
+    # Common mappings
+    mappings = {
+        "runny nose": "nasal congestion",
+        "stuffy nose": "nasal congestion",
+        "pain in joints": "joint pain",
+        "pain in muscles": "muscle pain",
+        "feeling tired": "fatigue",
+        "feeling weak": "weakness",
+    }
+    return mappings.get(s, s)
 
 def validate_prediction_input(data):
     """
@@ -59,29 +70,29 @@ def validate_prediction_input(data):
     if not symptoms_only:
         # Validate weight
         weight = data.get('weight')
-        if not isinstance(weight, (int, float)) or weight < 20 or weight > 300:
-            raise ValueError("Weight must be between 20 and 300 kg")
+        if not isinstance(weight, (int, float)) or weight < 1 or weight > 300:
+            raise ValueError("Weight must be between 1 and 300 kg")
     
     if not symptoms_only:
         # Validate blood pressure
         sys_bp = data.get('blood_pressure_systolic')
         dia_bp = data.get('blood_pressure_diastolic')
-        if not isinstance(sys_bp, (int, float)) or sys_bp < 50 or sys_bp > 250:
-            raise ValueError("Systolic BP must be between 50 and 250")
+        if not isinstance(sys_bp, (int, float)) or sys_bp < 60 or sys_bp > 250:
+            raise ValueError("Systolic BP must be between 60 and 250")
         if not isinstance(dia_bp, (int, float)) or dia_bp < 30 or dia_bp > 150:
             raise ValueError("Diastolic BP must be between 30 and 150")
     
     if not symptoms_only:
         # Validate glucose
         glucose = data.get('glucose')
-        if not isinstance(glucose, (int, float)) or glucose < 40 or glucose > 400:
-            raise ValueError("Glucose must be between 40 and 400 mg/dL")
+        if not isinstance(glucose, (int, float)) or glucose < 20 or glucose > 600:
+            raise ValueError("Glucose must be between 20 and 600 mg/dL")
     
     if not symptoms_only:
         # Validate cholesterol
         cholesterol = data.get('cholesterol')
-        if not isinstance(cholesterol, (int, float)) or cholesterol < 50 or cholesterol > 500:
-            raise ValueError("Cholesterol must be between 50 and 500 mg/dL")
+        if not isinstance(cholesterol, (int, float)) or cholesterol < 40 or cholesterol > 600:
+            raise ValueError("Cholesterol must be between 40 and 600 mg/dL")
     
     symptoms = data.get('symptoms', [])
     if symptoms:

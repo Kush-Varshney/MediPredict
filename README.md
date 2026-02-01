@@ -167,7 +167,8 @@ medipredict/
 │   │   └── page.tsx
 │   ├── page.tsx                     # Home page
 │   ├── layout.tsx                   # Root layout
-│   └── globals.css                  # Global styles
+│   ├── globals.css                  # Global styles
+│   └── icon.svg                     # App icon
 │
 ├── 📁 components/                   # React Components
 │   ├── 📁 ui/                       # Reusable UI components
@@ -175,17 +176,23 @@ medipredict/
 │   │   ├── button.tsx
 │   │   ├── card.tsx
 │   │   ├── input.tsx
+│   │   ├── modal.tsx
+│   │   ├── slider.tsx
 │   │   └── tabs.tsx
 │   ├── error-boundary.tsx           # Error handling
 │   ├── header.tsx                   # Navigation header
 │   ├── health-insights.tsx          # AI-generated insights
 │   ├── health-insights-placeholder.tsx
 │   ├── health-trends.tsx            # Health metrics trends
+│   ├── history-list.tsx             # Prediction history list
 │   ├── prediction-results.tsx       # Prediction display
+│   ├── prediction-success-modal.tsx # Success modal
 │   └── symptom-form.tsx             # Input form
 │
 ├── 📁 lib/                          # Utility libraries
-│   └── http.ts                      # HTTP client utilities
+│   ├── http.ts                      # HTTP client utilities
+│   └── 📁 validation/               # Validation utilities
+│       └── health-metrics.ts        # Health metrics validation
 │
 ├── 📁 server/                       # Node.js Backend Application
 │   └── 📁 src/
@@ -200,6 +207,10 @@ medipredict/
 │       │   └── user.js              # User management
 │       ├── 📁 services/             # Business logic services
 │       │   └── gemini.js            # Gemini API integration
+│       ├── 📁 utils/                # Utility functions
+│       │   ├── circuitBreaker.js    # Circuit breaker pattern
+│       │   ├── logger.js            # Logging utility
+│       │   └── validationConstants.js # Validation constants
 │       └── index.js                 # Express server setup
 │
 ├── 📁 ml/                           # Machine Learning Service
@@ -218,15 +229,19 @@ medipredict/
 │   ├── 📁 models/                   # Trained models (gitignored)
 │   │   ├── model.pkl
 │   │   ├── scaler.pkl
-│   │   └── label_encoders.pkl
+│   │   ├── label_encoders.pkl
+│   │   └── symptom_vocabulary.json  # Symptom vocabulary mapping
+│   ├── 📁 venv/                     # Python virtual environment (gitignored)
 │   ├── train.py                     # Model training script
 │   ├── setup_kaggle_dataset.py      # Dataset download script
 │   └── requirements.txt             # Python dependencies
 │
 ├── 📄 package.json                  # Frontend dependencies
+├── 📄 package-lock.json             # Frontend dependency lock file
 ├── 📄 tsconfig.json                 # TypeScript configuration
 ├── 📄 tailwind.config.ts            # Tailwind CSS configuration
-├── 📄 next.config.js                # Next.js configuration
+├── 📄 postcss.config.js             # PostCSS configuration
+├── 📄 next-env.d.ts                 # Next.js TypeScript definitions
 ├── 📄 .gitignore                    # Git ignore rules
 ├── 📄 README.md                     # Project documentation
 └── 📄 LICENSE                       # MIT License
@@ -238,12 +253,16 @@ medipredict/
 |-----------|---------|-----------|
 | **`app/`** | Next.js frontend application | Pages, API routes, layouts |
 | **`components/`** | Reusable React components | UI components, feature components |
+| **`lib/`** | Utility libraries and validation | HTTP client, validation helpers |
 | **`server/src/routes/`** | API endpoints | Authentication, predictions, user management |
 | **`server/src/models/`** | Database schemas | User, Prediction models |
 | **`server/src/services/`** | Business logic | Gemini API integration |
+| **`server/src/utils/`** | Utility functions | Circuit breaker, logger, constants |
+| **`server/logs/`** | Application logs | Server log files |
 | **`ml/src/api/`** | Flask ML service | Prediction endpoints, validators |
 | **`ml/src/models/`** | ML model training | Model trainer, evaluator |
 | **`ml/data/`** | Dataset storage | Diseases and symptoms dataset |
+| **`ml/models/`** | Trained models | Model files, vocabulary (gitignored) |
 
 ## 🛠️ Tech Stack
 

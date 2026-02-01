@@ -3,19 +3,42 @@ const axios = require("axios")
 const { body, validationResult } = require("express-validator")
 const auth = require("../middleware/auth")
 const Prediction = require("../models/Prediction")
-const { callGeminiAPI } = require("../services/gemini")
+const { callGeminiAPI, analyzeSymptomsWithGemini } = require("../services/gemini")
 const mongoose = require("mongoose")
+const { HEALTH_METRIC_RANGES } = require("../utils/validationConstants")
+const CircuitBreaker = require("../utils/circuitBreaker")
+const logger = require("../utils/logger")
+
 const router = express.Router()
+
+// Initialize Circuit Breaker for ML Service
+const mlCircuitBreaker = new CircuitBreaker("MLService", {
+  failureThreshold: 2,
+  requestTimeout: 5000,
+  resetTimeout: 30000,
+})
 
 // Validation middleware
 const validatePredictionInput = [
-  body("age").isInt({ min: 0, max: 150 }).withMessage("Age must be between 0 and 150"),
+  body("age")
+    .isInt({ min: HEALTH_METRIC_RANGES.age.min, max: HEALTH_METRIC_RANGES.age.max })
+    .withMessage(`Age must be between ${HEALTH_METRIC_RANGES.age.min} and ${HEALTH_METRIC_RANGES.age.max}`),
   body("gender").isIn(["M", "F", "Other"]).withMessage("Invalid gender"),
-  body("weight").isFloat({ min: 20, max: 300 }).withMessage("Weight must be between 20 and 300"),
-  body("bloodPressureSystolic").isInt({ min: 50, max: 250 }).withMessage("Invalid systolic BP"),
-  body("bloodPressureDiastolic").isInt({ min: 30, max: 150 }).withMessage("Invalid diastolic BP"),
-  body("glucose").isFloat({ min: 40, max: 400 }).withMessage("Invalid glucose level"),
-  body("cholesterol").isFloat({ min: 50, max: 500 }).withMessage("Invalid cholesterol level"),
+  body("weight")
+    .isFloat({ min: HEALTH_METRIC_RANGES.weight.min, max: HEALTH_METRIC_RANGES.weight.max })
+    .withMessage(`Weight must be between ${HEALTH_METRIC_RANGES.weight.min} and ${HEALTH_METRIC_RANGES.weight.max}`),
+  body("bloodPressureSystolic")
+    .isInt({ min: HEALTH_METRIC_RANGES.bloodPressureSystolic.min, max: HEALTH_METRIC_RANGES.bloodPressureSystolic.max })
+    .withMessage(`Systolic BP must be between ${HEALTH_METRIC_RANGES.bloodPressureSystolic.min} and ${HEALTH_METRIC_RANGES.bloodPressureSystolic.max}`),
+  body("bloodPressureDiastolic")
+    .isInt({ min: HEALTH_METRIC_RANGES.bloodPressureDiastolic.min, max: HEALTH_METRIC_RANGES.bloodPressureDiastolic.max })
+    .withMessage(`Diastolic BP must be between ${HEALTH_METRIC_RANGES.bloodPressureDiastolic.min} and ${HEALTH_METRIC_RANGES.bloodPressureDiastolic.max}`),
+  body("glucose")
+    .isFloat({ min: HEALTH_METRIC_RANGES.glucose.min, max: HEALTH_METRIC_RANGES.glucose.max })
+    .withMessage(`Glucose must be between ${HEALTH_METRIC_RANGES.glucose.min} and ${HEALTH_METRIC_RANGES.glucose.max}`),
+  body("cholesterol")
+    .isFloat({ min: HEALTH_METRIC_RANGES.cholesterol.min, max: HEALTH_METRIC_RANGES.cholesterol.max })
+    .withMessage(`Cholesterol must be between ${HEALTH_METRIC_RANGES.cholesterol.min} and ${HEALTH_METRIC_RANGES.cholesterol.max}`),
 ]
 
 // Make prediction
@@ -53,7 +76,7 @@ router.post("/", auth, validatePredictionInput, async (req, res) => {
 
     const http = axios.create({
       baseURL: process.env.ML_SERVICE_URL,
-      timeout: 30000,
+      timeout: 5000, // Client side timeout matching circuit breaker
     })
 
     const { age, gender, weight, bloodPressureSystolic, bloodPressureDiastolic, glucose, cholesterol, symptoms } =
@@ -73,33 +96,62 @@ router.post("/", auth, validatePredictionInput, async (req, res) => {
         .filter((s) => s.length > 0)
     }
 
+    const payload = {
+      age,
+      gender: gender === "M" ? 1 : 0,
+      weight,
+      blood_pressure_systolic: bloodPressureSystolic,
+      blood_pressure_diastolic: bloodPressureDiastolic,
+      glucose,
+      cholesterol,
+      symptoms: normalizedSymptoms,
+    }
 
-    // Call ML service
-    let mlResponse
+    // Execute prediction with Circuit Breaker and Fallback
+    let predictionData
+    let isFallback = false
+
     try {
-      mlResponse = await http.post(`/predict`, {
-        age,
-        gender: gender === "M" ? 1 : 0,
-        weight,
-        blood_pressure_systolic: bloodPressureSystolic,
-        blood_pressure_diastolic: bloodPressureDiastolic,
-        glucose,
-        cholesterol,
-        // Pass through symptoms list (strings); ML service maps to vocabulary if available
-        symptoms: normalizedSymptoms,
-      })
+      const mlResponse = await mlCircuitBreaker.execute(() => http.post(`/predict`, payload))
+      predictionData = mlResponse.data
     } catch (mlError) {
-      const status = mlError.response?.status || 503
-      const detail = mlError.response?.data || { message: "ML service unavailable" }
-      console.error("[Predict] ML Service error:")
-      console.error("  Status:", status)
-      console.error("  Message:", mlError.message)
-      console.error("  Response data:", detail)
-      console.error("  ML Service URL:", process.env.ML_SERVICE_URL)
-      // Attempt Gemini fallback to still provide precautions/diet guidance
-      let geminiFallback
+      logger.warn("[Predict] ML Service unavailable, triggering fallback", {
+        error: mlError.message,
+        circuitState: mlCircuitBreaker.state
+      })
+      
+      isFallback = true
+      
+      // Full Fallback to Gemini Analysis
+      const healthData = {
+        age, 
+        gender, 
+        weight, 
+        bloodPressureSystolic, 
+        bloodPressureDiastolic, 
+        glucose, 
+        cholesterol, 
+        symptoms: normalizedSymptoms
+      }
+      
+      predictionData = await analyzeSymptomsWithGemini(healthData)
+    }
+
+    const ml = predictionData
+    const confidenceNum = Number.isFinite(ml.confidence) ? Number(ml.confidence) : 0
+    const confidencePct = Number.isFinite(ml.confidence_percent)
+      ? Number(ml.confidence_percent)
+      : Math.round(confidenceNum * 10000) / 100
+
+    // If we didn't use fallback, we might still want Gemini enrichment if the ML model 
+    // didn't return detailed text fields (precautions/diet/explanation)
+    let geminiResponse = null
+    if (!isFallback) {
       try {
-        geminiFallback = await callGeminiAPI("General Health", {
+        // Only call if missing data or if we want to ensure high quality text
+        // For now, we always call it to ensure consistency with the original logic
+        // unless the ML model is very rich (which the current python one isn't fully)
+        geminiResponse = await callGeminiAPI(ml.predicted_disease, {
           age,
           gender,
           weight,
@@ -110,55 +162,33 @@ router.post("/", auth, validatePredictionInput, async (req, res) => {
           symptoms: normalizedSymptoms,
         })
       } catch (gemError) {
-        console.error("[Predict] Gemini fallback error:", gemError?.message)
+        logger.error("[Predict] Gemini API enrichment error:", { error: gemError?.message })
       }
-
-      return res.status(status).json({
-        message: "ML service error",
-        error: "ML_SERVICE_FAILED",
-        details: detail,
-        mlServiceUrl: process.env.ML_SERVICE_URL,
-        hint: "Ensure Flask ML service is running on port 5001",
-        // Provide Gemini guidance when available so UI can render recommendations
-        precautions: geminiFallback?.precautions || [],
-        diet: geminiFallback?.diet || [],
-        ai_explanation: geminiFallback?.explanation || "AI insights temporarily unavailable.",
-        // Include input metrics even in error case for Health Metrics Overview
-        age: age,
-        gender: gender,
-        weight: weight,
-        bloodPressureSystolic: bloodPressureSystolic,
-        bloodPressureDiastolic: bloodPressureDiastolic,
-        glucose: glucose,
-        cholesterol: cholesterol,
-        symptoms: normalizedSymptoms,
-      })
     }
 
-    const ml = mlResponse.data
-    const confidenceNum = Number.isFinite(ml.confidence) ? Number(ml.confidence) : 0
-    const confidencePct = Number.isFinite(ml.confidence_percent)
-      ? Number(ml.confidence_percent)
-      : Math.round(confidenceNum * 10000) / 100
+    // Merge data: Fallback data already has these fields. ML data might not.
+    // Gemini enrichment (geminiResponse) takes precedence over ML data for text fields.
+    const finalPrecautions = isFallback 
+      ? ml.precautions 
+      : (Array.isArray(geminiResponse?.precautions) ? geminiResponse.precautions : (ml.precautions || []))
 
-    // Call Gemini API for insights (robust to SDK/model errors)
-    let geminiResponse
-    try {
-      geminiResponse = await callGeminiAPI(ml.predicted_disease, {
-        age,
-        gender,
-        weight,
-        bloodPressureSystolic,
-        bloodPressureDiastolic,
-        glucose,
-        cholesterol,
-        symptoms: normalizedSymptoms,
-      })
-    } catch (gemError) {
-      console.error("[Predict] Gemini API error:", gemError?.message)
+    const finalDiet = isFallback 
+      ? ml.diet 
+      : (Array.isArray(geminiResponse?.diet) ? geminiResponse.diet : (ml.diet || []))
+
+    const finalExplanation = isFallback 
+      ? ml.ai_explanation 
+      : (geminiResponse?.explanation || ml.ai_explanation || "")
+
+    // Save prediction
+    let diseaseName = ml.predicted_disease || ml.predictedDisease || "Unknown"
+    
+    // Defensive check: Ensure disease name is not a UI component title (addressing reported issue)
+    if (diseaseName === "Health Insights & Recommendations") {
+      logger.warn("[Predict] Invalid disease name detected (UI title contamination), defaulting to Unknown", { original: diseaseName })
+      diseaseName = "Unknown"
     }
 
-    // Save prediction (prefer Gemini's structured guidance when available)
     const prediction = new Prediction({
       userId: req.user.userId,
       age,
@@ -169,24 +199,16 @@ router.post("/", auth, validatePredictionInput, async (req, res) => {
       glucose,
       cholesterol,
       symptoms: normalizedSymptoms,
-      predictedDisease: ml.predicted_disease || ml.predictedDisease || "Unknown",
-      confidence: Number.isFinite(ml.confidence) ? Number(ml.confidence) : confidenceNum,
-      confidencePercent: Number.isFinite(confidencePct) ? Number(confidencePct) : 0,
+      predictedDisease: diseaseName,
+      confidence: confidenceNum,
+      confidencePercent: confidencePct,
       riskLevel: ml.risk_level || ml.riskLevel || "Unknown",
-      precautions: Array.isArray(geminiResponse?.precautions)
-        ? geminiResponse.precautions
-        : Array.isArray(ml.precautions)
-        ? ml.precautions
-        : [],
-      diet: Array.isArray(geminiResponse?.diet)
-        ? geminiResponse.diet
-        : Array.isArray(ml.diet)
-        ? ml.diet
-        : [],
-      aiExplanation: geminiResponse?.explanation || ml.ai_explanation || "",
+      precautions: finalPrecautions,
+      diet: finalDiet,
+      aiExplanation: finalExplanation,
       usedSymptomsPath: !!ml.used_symptoms_path,
       matchedSymptoms: Number.isFinite(ml.matched_symptoms) ? Number(ml.matched_symptoms) : 0,
-      modelType: ml.model_type || "",
+      modelType: ml.model_type || (isFallback ? "gemini-fallback" : "ml-service"),
     })
 
     await prediction.save()
@@ -237,13 +259,9 @@ router.post("/", auth, validatePredictionInput, async (req, res) => {
 // Get prediction history
 router.get("/history", auth, async (req, res) => {
   try {
-    const { limit = 10, skip = 0 } = req.query
     const predictions = await Prediction.find({ userId: req.user.userId })
       .sort({ createdAt: -1 })
-      .limit(Number.parseInt(limit))
-      .skip(Number.parseInt(skip))
       .lean() // Return plain JavaScript objects instead of Mongoose documents
-
     const total = await Prediction.countDocuments({ userId: req.user.userId })
 
     // Ensure consistent field naming for frontend
@@ -274,9 +292,7 @@ router.get("/history", auth, async (req, res) => {
 
     res.json({
       predictions: serializedPredictions,
-      total,
-      limit: Number.parseInt(limit),
-      skip: Number.parseInt(skip),
+      total
     })
   } catch (error) {
     res.status(500).json({ message: error.message })

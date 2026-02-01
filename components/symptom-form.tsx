@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Slider } from "@/components/ui/slider"
+import { HEALTH_METRIC_RANGES, MESSAGES } from "@/lib/validation/health-metrics"
 
 const COMMON_SYMPTOMS = [
   "Fever",
@@ -39,13 +41,14 @@ interface SymptomFormProps {
 export default function SymptomForm({ onSubmit, loading }: SymptomFormProps) {
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([])
   const [customSymptom, setCustomSymptom] = useState("")
-  const [age, setAge] = useState<number>(30)
+  const [age, setAge] = useState<number | "">(30)
   const [gender, setGender] = useState<"M" | "F" | "Other">("M")
-  const [weight, setWeight] = useState<number>(70)
-  const [bpSys, setBpSys] = useState<number>(120)
-  const [bpDia, setBpDia] = useState<number>(80)
-  const [glucose, setGlucose] = useState<number>(100)
-  const [cholesterol, setCholesterol] = useState<number>(180)
+  const [weight, setWeight] = useState<number | "">(70)
+  const [bpSys, setBpSys] = useState<number | "">(120)
+  const [bpDia, setBpDia] = useState<number | "">(80)
+  const [glucose, setGlucose] = useState<number | "">(100)
+  const [cholesterol, setCholesterol] = useState<number | "">(180)
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
   const toggleSymptom = (symptom: string) => {
     setSelectedSymptoms((prev) => (prev.includes(symptom) ? prev.filter((s) => s !== symptom) : [...prev, symptom]))
@@ -58,34 +61,138 @@ export default function SymptomForm({ onSubmit, loading }: SymptomFormProps) {
     }
   }
 
+  const validateValue = (name: keyof typeof HEALTH_METRIC_RANGES, value: number | "") => {
+    if (value === "") return `${HEALTH_METRIC_RANGES[name].label} is required`
+    const { min, max, label, unit } = HEALTH_METRIC_RANGES[name]
+    if (value < min || value > max) {
+      return MESSAGES.rangeError(label, min, max, unit)
+    }
+    return ""
+  }
+
+  const handleBlur = (name: keyof typeof HEALTH_METRIC_RANGES, value: number | "") => {
+    const error = validateValue(name, value)
+    setErrors((prev) => ({ ...prev, [name]: error }))
+  }
+
+  const handleChange = (name: string, value: string, setter: (val: number | "") => void) => {
+    if (value === "") {
+      setter("")
+      return
+    }
+    const num = parseFloat(value)
+    if (!isNaN(num)) {
+      setter(num)
+      // Clear error if valid as they type? Or wait for blur? 
+      // User asked for "live masking" which implies blocking invalid formats, 
+      // but usually validation messages are better on blur or submit to avoid annoyance while typing.
+      // However, "Frontend: block form submission and surface an inline error" is required.
+    }
+  }
+
   const handleSubmit = () => {
-    if (selectedSymptoms.length === 0) {
+    const newErrors: Record<string, string> = {}
+    
+    newErrors.age = validateValue("age", age)
+    newErrors.weight = validateValue("weight", weight)
+    newErrors.bloodPressureSystolic = validateValue("bloodPressureSystolic", bpSys)
+    newErrors.bloodPressureDiastolic = validateValue("bloodPressureDiastolic", bpDia)
+    newErrors.glucose = validateValue("glucose", glucose)
+    newErrors.cholesterol = validateValue("cholesterol", cholesterol)
+
+    // Filter out empty error strings
+    Object.keys(newErrors).forEach(key => {
+      if (!newErrors[key]) delete newErrors[key]
+    })
+
+    setErrors(newErrors)
+
+    if (Object.keys(newErrors).length > 0) {
       return
     }
 
-    const validationErrors: string[] = []
-    if (age < 1 || age > 150) validationErrors.push("Age must be 1-150")
-    if (weight < 20 || weight > 300) validationErrors.push("Weight must be 20-300 kg")
-    if (bpSys < 50 || bpSys > 250) validationErrors.push("BP Systolic must be 50-250")
-    if (bpDia < 30 || bpDia > 150) validationErrors.push("BP Diastolic must be 30-150")
-    if (glucose < 40 || glucose > 400) validationErrors.push("Glucose must be 40-400 mg/dL")
-    if (cholesterol < 50 || cholesterol > 500) validationErrors.push("Cholesterol must be 50-500 mg/dL")
-
-    if (validationErrors.length > 0) {
-      console.warn("[v0] Form validation failed:", validationErrors)
+    if (selectedSymptoms.length === 0) {
+      // Maybe show an error for symptoms too?
       return
     }
 
     onSubmit({
-      age,
+      age: Number(age),
       gender,
-      weight,
-      bloodPressureSystolic: bpSys,
-      bloodPressureDiastolic: bpDia,
-      glucose,
-      cholesterol,
+      weight: Number(weight),
+      bloodPressureSystolic: Number(bpSys),
+      bloodPressureDiastolic: Number(bpDia),
+      glucose: Number(glucose),
+      cholesterol: Number(cholesterol),
       symptoms: selectedSymptoms,
     })
+  }
+
+  const renderInput = (
+    id: keyof typeof HEALTH_METRIC_RANGES, 
+    value: number | "", 
+    setter: (val: number | "") => void,
+    errorKey: string = id,
+    useSlider: boolean = false
+  ) => {
+    const config = HEALTH_METRIC_RANGES[id]
+    const hasError = !!errors[errorKey]
+    
+    return (
+      <div>
+        <label className="text-sm font-medium text-medical-700 block mb-1">
+          {config.label} {config.unit ? `(${config.unit})` : ""}
+        </label>
+        <div className="space-y-2">
+          <input
+            type="number"
+            min={config.min}
+            max={config.max}
+            step={config.step}
+            value={value}
+            onChange={(e) => handleChange(id, e.target.value, setter)}
+            onBlur={() => handleBlur(id, value)}
+            className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
+              hasError 
+                ? "border-red-500 focus:ring-red-200" 
+                : "border-medical-300 focus:ring-medical-500"
+            }`}
+            aria-invalid={hasError}
+            aria-describedby={`${id}-hint ${id}-error`}
+          />
+          {useSlider && (
+            <Slider
+              min={config.min}
+              max={config.max}
+              step={config.step}
+              value={value === "" ? config.min : value}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value)
+                setter(val)
+                // Clear error on slider move if valid?
+                if (val >= config.min && val <= config.max) {
+                   setErrors((prev) => {
+                      const newErrs = { ...prev }
+                      delete newErrs[id]
+                      return newErrs
+                   })
+                }
+              }}
+            />
+          )}
+        </div>
+        {/* Persistent helper text / range hint */}
+        <p id={`${id}-hint`} className="text-xs text-gray-500 mt-1">
+          Range: {config.min} – {config.max} {config.unit}
+        </p>
+        {/* Inline Error */}
+        {hasError && (
+          <p id={`${id}-error`} className="text-xs text-red-600 mt-1 font-medium" role="alert">
+            {errors[errorKey]}
+          </p>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -95,19 +202,9 @@ export default function SymptomForm({ onSubmit, loading }: SymptomFormProps) {
 
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
+            {renderInput("age", age, setAge)}
             <div>
-              <label className="text-sm font-medium text-medical-700 block mb-2">Age</label>
-              <input
-                type="number"
-                min={0}
-                max={150}
-                value={age}
-                onChange={(e) => setAge(Number(e.target.value))}
-                className="w-full px-3 py-2 border border-medical-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-medical-500"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-medical-700 block mb-2">Gender</label>
+              <label className="text-sm font-medium text-medical-700 block mb-1">Gender</label>
               <select
                 value={gender}
                 onChange={(e) => setGender(e.target.value as any)}
@@ -117,65 +214,21 @@ export default function SymptomForm({ onSubmit, loading }: SymptomFormProps) {
                 <option value="F">Female</option>
                 <option value="Other">Other</option>
               </select>
+              {/* Spacer to align with inputs that have hints */}
+              <p className="text-xs text-transparent mt-1">Spacer</p>
             </div>
-            <div>
-              <label className="text-sm font-medium text-medical-700 block mb-2">Weight (kg)</label>
-              <input
-                type="number"
-                min={20}
-                max={300}
-                value={weight}
-                onChange={(e) => setWeight(Number(e.target.value))}
-                className="w-full px-3 py-2 border border-medical-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-medical-500"
-              />
+            
+            {renderInput("weight", weight, setWeight, "weight", true)}
+            
+            <div className="col-span-2 grid grid-cols-2 gap-3">
+              {renderInput("bloodPressureSystolic", bpSys, setBpSys, "bloodPressureSystolic")}
+              {renderInput("bloodPressureDiastolic", bpDia, setBpDia, "bloodPressureDiastolic")}
             </div>
-            <div className="grid grid-cols-2 gap-3 col-span-2">
-              <div>
-                <label className="text-sm font-medium text-medical-700 block mb-2">BP Systolic</label>
-                <input
-                  type="number"
-                  min={50}
-                  max={250}
-                  value={bpSys}
-                  onChange={(e) => setBpSys(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-medical-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-medical-500"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-medical-700 block mb-2">BP Diastolic</label>
-                <input
-                  type="number"
-                  min={30}
-                  max={150}
-                  value={bpDia}
-                  onChange={(e) => setBpDia(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-medical-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-medical-500"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-medical-700 block mb-2">Glucose (mg/dL)</label>
-              <input
-                type="number"
-                min={40}
-                max={400}
-                value={glucose}
-                onChange={(e) => setGlucose(Number(e.target.value))}
-                className="w-full px-3 py-2 border border-medical-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-medical-500"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-medical-700 block mb-2">Cholesterol (mg/dL)</label>
-              <input
-                type="number"
-                min={50}
-                max={500}
-                value={cholesterol}
-                onChange={(e) => setCholesterol(Number(e.target.value))}
-                className="w-full px-3 py-2 border border-medical-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-medical-500"
-              />
-            </div>
+            
+            {renderInput("glucose", glucose, setGlucose)}
+            {renderInput("cholesterol", cholesterol, setCholesterol)}
           </div>
+          
           <div>
             <label className="text-sm font-medium text-medical-700 block mb-3">Common Symptoms</label>
             <div className="grid grid-cols-2 gap-2">

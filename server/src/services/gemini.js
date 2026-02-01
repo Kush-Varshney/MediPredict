@@ -8,7 +8,7 @@ function withTimeout(promise, timeoutMs = 10000) {
 }
 
 const apiKey = process.env.GEMINI_API_KEY
-const preferredModel = process.env.GEMINI_MODEL || "gemini-2.0-flash"
+const preferredModel = process.env.GEMINI_MODEL || "gemini-2.5-flash"
 let genAI = null
 if (apiKey && apiKey.trim()) {
   genAI = new GoogleGenerativeAI(apiKey)
@@ -34,7 +34,7 @@ async function resolveModel() {
     }
   }
 
-  const candidates = ["gemini-2.0-flash", "gemini-1.5-flash-8b", "gemini-1.5-flash"]
+  const candidates = ["gemini-2.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-flash"]
 
   let lastErr
   for (const name of candidates) {
@@ -137,4 +137,84 @@ Only return the JSON object, no additional text.`
   }
 }
 
-module.exports = { callGeminiAPI }
+async function analyzeSymptomsWithGemini(healthData) {
+  try {
+    if (!genAI) {
+      throw new Error("GEMINI_API_KEY is not configured");
+    }
+
+    const model = await resolveModel();
+    
+    // Normalize gender for prompt
+    const genderStr = healthData.gender === 1 || healthData.gender === 'M' ? 'Male' : 
+                     healthData.gender === 0 || healthData.gender === 'F' ? 'Female' : 'Other';
+
+    const prompt = `You are a highly experienced medical diagnostic AI. 
+Analyze the following patient data and symptoms to predict the most likely disease or condition.
+
+Patient Profile:
+- Age: ${healthData.age}
+- Gender: ${genderStr}
+- Weight: ${healthData.weight} kg
+- Vitals: BP ${healthData.bloodPressureSystolic}/${healthData.bloodPressureDiastolic}, Glucose ${healthData.glucose}, Cholesterol ${healthData.cholesterol}
+- Reported Symptoms: ${Array.isArray(healthData.symptoms) ? healthData.symptoms.join(', ') : healthData.symptoms}
+
+Your task is to:
+1. Predict the most likely disease/condition based on the symptoms and vitals.
+2. Assign a confidence score (0.0-1.0) and risk level (Low/Medium/High).
+3. Provide a brief medical explanation, specific precautions, and dietary recommendations.
+
+IMPORTANT: You are a fallback system for an ML model. You must be accurate but safe. If symptoms are vague, suggest "Viral Infection" or "General Fatigue" with lower confidence. If critical, suggest "Urgent Medical Attention Needed".
+
+Response Format (JSON ONLY):
+{
+  "predicted_disease": "Name of Disease",
+  "confidence": 0.95,
+  "risk_level": "High",
+  "explanation": "Medical explanation...",
+  "precautions": ["precaution 1", "precaution 2", ...],
+  "diet": ["diet recommendation 1", ...]
+}`;
+
+    const result = await withTimeout(model.generateContent(prompt), 15000);
+    const response = await result.response;
+    const text = response.text();
+    
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("Could not parse JSON from Gemini analysis");
+    
+    const parsed = JSON.parse(jsonMatch[0]);
+    
+    // Normalize structure to match ML service
+    return {
+      predicted_disease: parsed.predicted_disease || "Unknown Condition",
+      confidence: parsed.confidence || 0.5,
+      confidence_percent: (parsed.confidence || 0.5) * 100,
+      risk_level: parsed.risk_level || "Medium",
+      precautions: Array.isArray(parsed.precautions) ? parsed.precautions : [],
+      diet: Array.isArray(parsed.diet) ? parsed.diet : [],
+      ai_explanation: parsed.explanation || "",
+      used_symptoms_path: false,
+      matched_symptoms: Array.isArray(healthData.symptoms) ? healthData.symptoms.length : 0,
+      model_type: "gemini-fallback"
+    };
+
+  } catch (error) {
+    console.error("[Gemini] Fallback analysis failed:", error.message);
+    // Return a safe default if even Gemini fails
+    return {
+      predicted_disease: "Medical Consultation Required",
+      confidence: 0,
+      confidence_percent: 0,
+      risk_level: "Unknown",
+      precautions: ["Consult a doctor immediately", "Monitor symptoms"],
+      diet: ["Maintain balanced diet"],
+      ai_explanation: "Automated analysis failed. Please consult a healthcare professional directly.",
+      used_symptoms_path: false,
+      matched_symptoms: 0,
+      model_type: "failure-fallback"
+    };
+  }
+}
+
+module.exports = { callGeminiAPI, analyzeSymptomsWithGemini }

@@ -124,8 +124,6 @@ mongoose.connection.on("error", (err) => {
 // Routes
 app.use("/api/auth", require("./routes/auth"))
 app.use("/api/predict", require("./routes/predict"))
-// Public prediction route disabled to enforce authentication-only access
-// app.use("/api/predict/public", require("./routes/predict_public"))
 app.use("/api/user", require("./routes/user"))
 
 // Health check

@@ -13,24 +13,13 @@ import ErrorBoundary from "@/components/error-boundary"
 import HealthTrends from "@/components/health-trends"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { retryFetch, parseJsonSafe } from "@/lib/http"
+import PredictionSuccessModal from "@/components/prediction-success-modal"
+import HistoryList from "@/components/history-list"
 
 const HealthInsights = dynamic(() => import("@/components/health-insights"), {
   loading: () => <HealthInsightsSkeleton />,
   ssr: true,
 })
-
-interface Prediction {
-  _id: string
-  id?: string
-  symptoms: string[]
-  predictedDisease?: string
-  predicted_disease?: string
-  confidencePercent?: number
-  confidence_percent?: number
-  riskLevel?: string
-  risk_level?: string
-  createdAt: string
-}
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -40,7 +29,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false)
   const [symptoms, setSymptoms] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  
+  // Modal state
+  const [successModalOpen, setSuccessModalOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState("predict")
 
   useEffect(() => {
     // Check authentication
@@ -59,7 +51,7 @@ export default function DashboardPage() {
   const fetchPredictionHistory = async () => {
     try {
       const token = localStorage.getItem("token")
-      const response = await retryFetch("/api/predictions/history", {
+      const response = await retryFetch(`/api/predictions/history`, {
         headers: { Authorization: `Bearer ${token}` },
         timeoutMs: 15000,
         retries: 1,
@@ -87,7 +79,7 @@ export default function DashboardPage() {
     setSymptoms(payload.symptoms)
     setLoading(true)
     setError(null)
-    setNotice(null)
+    setSuccessModalOpen(false)
 
     try {
       const token = localStorage.getItem("token")
@@ -120,10 +112,12 @@ export default function DashboardPage() {
       }
 
       setCurrentPrediction(data)
-      setNotice("Prediction completed successfully")
-
-      // Refresh history
-      fetchPredictionHistory()
+      
+      // Refresh history first to ensure it's up to date
+      await fetchPredictionHistory()
+      
+      // Open success modal instead of setting notice string
+      setSuccessModalOpen(true)
     } catch (error) {
       console.error("[v0] Prediction error:", error)
       setError(
@@ -170,7 +164,7 @@ export default function DashboardPage() {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
-        <Tabs defaultValue="predict" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="predict">New Prediction</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
@@ -187,11 +181,7 @@ export default function DashboardPage() {
                     <AlertDescription>{error}</AlertDescription>
                   </Alert>
                 )}
-                {notice && !loading && (
-                  <Alert className="mb-4">
-                    <AlertDescription>{notice}</AlertDescription>
-                  </Alert>
-                )}
+                {/* Notice Alert removed in favor of Modal */}
                 {loading && (
                   <div className="flex items-center justify-center h-96 bg-white rounded-lg shadow-lg">
                     <div className="text-center">
@@ -227,44 +217,26 @@ export default function DashboardPage() {
                 <CardDescription>Your previous health predictions and analyses</CardDescription>
               </CardHeader>
               <CardContent>
-                {predictions.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-medical-600">No predictions yet. Start by creating a new prediction.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {predictions.length > 0 && <HealthTrends predictions={predictions as any} />}
-                    {predictions.map((pred: Prediction, idx: number) => (
-                      <Card key={pred._id || `${pred.createdAt}-${idx}`} className="border-medical-200">
-                        <CardContent className="pt-6">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <p className="font-semibold text-medical-900">
-                                {pred.predictedDisease || pred.predicted_disease || "Unknown"}
-                              </p>
-                              <p className="text-sm text-medical-600 mt-1">
-                                Symptoms: {pred.symptoms?.join(", ") || "N/A"}
-                              </p>
-                              <p className="text-xs text-medical-400 mt-2">
-                                {new Date(pred.createdAt).toLocaleDateString()}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <div className="inline-block px-3 py-1 rounded-full text-sm font-medium bg-medical-100 text-medical-700">
-                                {Math.round(pred.confidencePercent || pred.confidence_percent || 0)}% confidence
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
+                {predictions.length > 0 && <HealthTrends predictions={predictions as any} />}
+                <div className="mt-6">
+                  <HistoryList predictions={predictions} />
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
       </div>
+
+      <PredictionSuccessModal 
+        isOpen={successModalOpen}
+        onClose={() => setSuccessModalOpen(false)}
+        prediction={currentPrediction}
+        onViewDetails={() => setSuccessModalOpen(false)}
+        onViewHistory={() => {
+          setSuccessModalOpen(false)
+          setActiveTab("history")
+        }}
+      />
     </div>
   )
 }
