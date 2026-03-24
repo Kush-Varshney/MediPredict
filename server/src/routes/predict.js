@@ -28,33 +28,34 @@ const validatePredictionInput = [
     .isFloat({ min: HEALTH_METRIC_RANGES.weight.min, max: HEALTH_METRIC_RANGES.weight.max })
     .withMessage(`Weight must be between ${HEALTH_METRIC_RANGES.weight.min} and ${HEALTH_METRIC_RANGES.weight.max}`),
   body("bloodPressureSystolic")
+    .optional({ nullable: true })
     .isInt({ min: HEALTH_METRIC_RANGES.bloodPressureSystolic.min, max: HEALTH_METRIC_RANGES.bloodPressureSystolic.max })
     .withMessage(`Systolic BP must be between ${HEALTH_METRIC_RANGES.bloodPressureSystolic.min} and ${HEALTH_METRIC_RANGES.bloodPressureSystolic.max}`),
   body("bloodPressureDiastolic")
+    .optional({ nullable: true })
     .isInt({ min: HEALTH_METRIC_RANGES.bloodPressureDiastolic.min, max: HEALTH_METRIC_RANGES.bloodPressureDiastolic.max })
     .withMessage(`Diastolic BP must be between ${HEALTH_METRIC_RANGES.bloodPressureDiastolic.min} and ${HEALTH_METRIC_RANGES.bloodPressureDiastolic.max}`),
   body("glucose")
+    .optional({ nullable: true })
     .isFloat({ min: HEALTH_METRIC_RANGES.glucose.min, max: HEALTH_METRIC_RANGES.glucose.max })
     .withMessage(`Glucose must be between ${HEALTH_METRIC_RANGES.glucose.min} and ${HEALTH_METRIC_RANGES.glucose.max}`),
   body("cholesterol")
+    .optional({ nullable: true })
     .isFloat({ min: HEALTH_METRIC_RANGES.cholesterol.min, max: HEALTH_METRIC_RANGES.cholesterol.max })
     .withMessage(`Cholesterol must be between ${HEALTH_METRIC_RANGES.cholesterol.min} and ${HEALTH_METRIC_RANGES.cholesterol.max}`),
+  body().custom((value) => {
+    const hasSys = value.bloodPressureSystolic !== null && value.bloodPressureSystolic !== undefined
+    const hasDia = value.bloodPressureDiastolic !== null && value.bloodPressureDiastolic !== undefined
+    if (hasSys !== hasDia) {
+      throw new Error("Provide both systolic and diastolic blood pressure values, or leave both unknown")
+    }
+    return true
+  }),
 ]
 
 // Make prediction
 router.post("/", auth, validatePredictionInput, async (req, res) => {
   try {
-    // Fail fast if DB is not connected to avoid Mongoose buffering timeouts
-    if (mongoose.connection.readyState !== 1) {
-      console.error("[Predict] Database not connected; failing fast to avoid buffering timeouts")
-      return res.status(503).json({
-        message: "Database not connected",
-        error: "DB_UNAVAILABLE",
-        details: "MongoDB is not connected; please ensure MONGO_URI points to a running instance",
-        dbConnected: false,
-      })
-    }
-
     if (!process.env.ML_SERVICE_URL) {
       console.error("[Predict] FATAL: ML_SERVICE_URL not configured")
       return res.status(500).json({
@@ -98,12 +99,12 @@ router.post("/", auth, validatePredictionInput, async (req, res) => {
 
     const payload = {
       age,
-      gender: gender === "M" ? 1 : 0,
+      gender: gender === "M" ? 1 : gender === "F" ? 0 : 0.5,
       weight,
-      blood_pressure_systolic: bloodPressureSystolic,
-      blood_pressure_diastolic: bloodPressureDiastolic,
-      glucose,
-      cholesterol,
+      blood_pressure_systolic: bloodPressureSystolic ?? null,
+      blood_pressure_diastolic: bloodPressureDiastolic ?? null,
+      glucose: glucose ?? null,
+      cholesterol: cholesterol ?? null,
       symptoms: normalizedSymptoms,
     }
 
@@ -138,10 +139,12 @@ router.post("/", auth, validatePredictionInput, async (req, res) => {
     }
 
     const ml = predictionData
-    const confidenceNum = Number.isFinite(ml.confidence) ? Number(ml.confidence) : 0
+    const confidenceNum = Number.isFinite(Number(ml.confidence)) ? Number(ml.confidence) : null
     const confidencePct = Number.isFinite(ml.confidence_percent)
       ? Number(ml.confidence_percent)
-      : Math.round(confidenceNum * 10000) / 100
+      : confidenceNum === null
+        ? null
+        : Math.round(confidenceNum * 10000) / 100
 
     // If we didn't use fallback, we might still want Gemini enrichment if the ML model 
     // didn't return detailed text fields (precautions/diet/explanation)
@@ -189,8 +192,71 @@ router.post("/", auth, validatePredictionInput, async (req, res) => {
       diseaseName = "Unknown"
     }
 
-    const prediction = new Prediction({
-      userId: req.user.userId,
+    let prediction = null
+    let persisted = false
+    if (mongoose.connection.readyState === 1) {
+      prediction = new Prediction({
+        userId: req.user.userId,
+        age,
+        gender,
+        weight,
+        bloodPressureSystolic,
+        bloodPressureDiastolic,
+        glucose,
+        cholesterol,
+        symptoms: normalizedSymptoms,
+        predictedDisease: diseaseName,
+        confidence: confidenceNum,
+        confidencePercent: confidencePct,
+        riskLevel: ml.risk_level || ml.riskLevel || "Unknown",
+        precautions: finalPrecautions,
+        diet: finalDiet,
+        aiExplanation: finalExplanation,
+        usedSymptomsPath: !!ml.used_symptoms_path,
+        matchedSymptoms: Number.isFinite(ml.matched_symptoms) ? Number(ml.matched_symptoms) : 0,
+        modelType: ml.model_type || (isFallback ? "gemini-fallback" : "ml-service"),
+      })
+      await prediction.save()
+      persisted = true
+    } else {
+      logger.warn("[Predict] DB not connected; returning non-persisted prediction")
+    }
+
+    // Prepare response with all metrics
+    const responseData = {
+      predicted_disease: persisted ? prediction.predictedDisease : diseaseName,
+      confidence: confidenceNum,
+      confidence_percent: confidencePct,
+      confidence_source: ml.confidence_source || (isFallback ? "llm_estimate" : "model_proba"),
+      risk_level: persisted ? prediction.riskLevel : (ml.risk_level || ml.riskLevel || "Unknown"),
+      clinical_risk: ml.clinical_risk || (ml.risk_level || ml.riskLevel || "Unknown"),
+      analysis_mode: ml.analysis_mode || (ml.used_symptoms_path ? "symptom_only" : "metrics_only"),
+      metrics_used_count: Number.isFinite(ml.metrics_used_count) ? Number(ml.metrics_used_count) : 0,
+      precautions: persisted ? prediction.precautions : finalPrecautions,
+      diet: persisted ? prediction.diet : finalDiet,
+      ai_explanation: persisted ? prediction.aiExplanation : finalExplanation,
+      used_symptoms_path: persisted ? prediction.usedSymptomsPath : !!ml.used_symptoms_path,
+      matched_symptoms: persisted
+        ? prediction.matchedSymptoms
+        : (Number.isFinite(ml.matched_symptoms) ? Number(ml.matched_symptoms) : 0),
+      symptom_evidence: ml.symptom_evidence || null,
+      metric_assessment: ml.metric_assessment || null,
+      uncertainty: ml.uncertainty || null,
+      model_type: persisted ? prediction.modelType : (ml.model_type || (isFallback ? "gemini-fallback" : "ml-service")),
+      prediction_source: isFallback ? "llm_fallback" : "ml_service",
+      top_k: Array.isArray(ml.top_k) ? ml.top_k : [],
+      persisted,
+      input_snapshot: {
+        age,
+        gender,
+        weight,
+        bloodPressureSystolic,
+        bloodPressureDiastolic,
+        glucose,
+        cholesterol,
+        symptoms: normalizedSymptoms,
+      },
+      // Legacy flattened fields for backward compatibility
       age,
       gender,
       weight,
@@ -199,43 +265,7 @@ router.post("/", auth, validatePredictionInput, async (req, res) => {
       glucose,
       cholesterol,
       symptoms: normalizedSymptoms,
-      predictedDisease: diseaseName,
-      confidence: confidenceNum,
-      confidencePercent: confidencePct,
-      riskLevel: ml.risk_level || ml.riskLevel || "Unknown",
-      precautions: finalPrecautions,
-      diet: finalDiet,
-      aiExplanation: finalExplanation,
-      usedSymptomsPath: !!ml.used_symptoms_path,
-      matchedSymptoms: Number.isFinite(ml.matched_symptoms) ? Number(ml.matched_symptoms) : 0,
-      modelType: ml.model_type || (isFallback ? "gemini-fallback" : "ml-service"),
-    })
-
-    await prediction.save()
-
-    // Prepare response with all metrics
-    const responseData = {
-      predicted_disease: prediction.predictedDisease,
-      confidence: prediction.confidence,
-      confidence_percent: prediction.confidencePercent,
-      risk_level: prediction.riskLevel,
-      precautions: prediction.precautions,
-      diet: prediction.diet,
-      ai_explanation: prediction.aiExplanation,
-      used_symptoms_path: prediction.usedSymptomsPath,
-      matched_symptoms: prediction.matchedSymptoms,
-      model_type: prediction.modelType,
-      // Include input metrics for Health Metrics Overview - CRITICAL for UI
-      age: age,
-      gender: gender,
-      weight: weight,
-      bloodPressureSystolic: bloodPressureSystolic,
-      bloodPressureDiastolic: bloodPressureDiastolic,
-      glucose: glucose,
-      cholesterol: cholesterol,
-      symptoms: normalizedSymptoms,
-      // Include timestamp for trends
-      createdAt: prediction.createdAt?.toISOString() || new Date().toISOString(),
+      createdAt: persisted ? (prediction.createdAt?.toISOString() || new Date().toISOString()) : new Date().toISOString(),
     }
 
 

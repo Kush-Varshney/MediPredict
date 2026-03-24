@@ -40,7 +40,7 @@ export function Tabs({
 }
 
 export function TabsList({ className, children }: { className?: string; children: React.ReactNode }) {
-  return <div className={className}>{children}</div>
+  return <div className={`rounded-lg border border-slate-700 bg-slate-900/70 p-1 ${className || ""}`}>{children}</div>
 }
 
 export function TabsTrigger({ value, className, children }: { value: string; className?: string; children: React.ReactNode }) {
@@ -53,7 +53,7 @@ export function TabsTrigger({ value, className, children }: { value: string; cla
       className={[
         "inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-medium transition-colors",
         "focus:outline-none focus:ring-2",
-        isActive ? "bg-medical-600 text-white" : "bg-white text-medical-700 hover:bg-medical-100",
+        isActive ? "bg-gradient-to-r from-cyan-500 to-teal-500 text-white" : "bg-transparent text-slate-300 hover:bg-slate-800",
         className || "",
       ].join(" ")}
       aria-pressed={isActive}

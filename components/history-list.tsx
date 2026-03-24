@@ -36,22 +36,22 @@ export default function HistoryList({ predictions }: { predictions: Prediction[]
 
   const getRiskColor = (level?: string) => {
     const l = (level || "").toLowerCase()
-    if (l.includes("high")) return "bg-red-100 text-red-700 border-red-200"
-    if (l.includes("medium")) return "bg-yellow-100 text-yellow-700 border-yellow-200"
-    if (l.includes("low")) return "bg-green-100 text-green-700 border-green-200"
-    return "bg-gray-100 text-gray-700 border-gray-200"
+    if (l.includes("high")) return "bg-red-500/15 text-red-200 border-red-500/40"
+    if (l.includes("medium")) return "bg-amber-500/15 text-amber-200 border-amber-500/40"
+    if (l.includes("low")) return "bg-emerald-500/15 text-emerald-200 border-emerald-500/40"
+    return "bg-slate-700/40 text-slate-200 border-slate-600"
   }
 
   if (predictions.length === 0) {
     return (
-      <div className="text-center py-12 bg-white rounded-lg border border-medical-200 shadow-sm">
-        <div className="mx-auto w-12 h-12 bg-medical-50 rounded-full flex items-center justify-center mb-4">
-          <svg className="w-6 h-6 text-medical-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="text-center py-12 bg-slate-900/70 rounded-lg border border-slate-700 shadow-sm">
+        <div className="mx-auto w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mb-4">
+          <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
-        <p className="text-medical-600 font-medium">No history records found.</p>
-        <p className="text-medical-400 text-sm mt-1">Make a new prediction to populate your history.</p>
+        <p className="text-slate-200 font-medium">No history records found.</p>
+        <p className="text-slate-400 text-sm mt-1">Make a new prediction to populate your history.</p>
       </div>
     )
   }
@@ -76,7 +76,7 @@ export default function HistoryList({ predictions }: { predictions: Prediction[]
         const precautions = pred.precautions || []
         
         return (
-          <Card key={id} className={`border-medical-200 transition-all duration-200 ${isExpanded ? 'ring-2 ring-medical-500 shadow-lg' : 'hover:shadow-md'}`}>
+          <Card key={id} className={`border-slate-700 transition-all duration-200 ${isExpanded ? 'ring-2 ring-cyan-500 shadow-lg' : 'hover:shadow-md'}`}>
             <CardContent className="p-0">
               {/* Header / Summary View */}
               <div 
@@ -85,12 +85,12 @@ export default function HistoryList({ predictions }: { predictions: Prediction[]
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-1">
-                    <h3 className="text-lg font-bold text-medical-900">{disease}</h3>
+                    <h3 className="text-lg font-bold text-slate-100">{disease}</h3>
                     <span className={`text-xs px-2 py-0.5 rounded-full border ${getRiskColor(risk)}`}>
                       {risk} Risk
                     </span>
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-medical-500">
+                  <div className="flex items-center gap-4 text-sm text-slate-400">
                     <span className="flex items-center gap-1">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -108,8 +108,8 @@ export default function HistoryList({ predictions }: { predictions: Prediction[]
                 
                 <div className="flex items-center gap-4">
                   <div className="hidden md:block text-right">
-                    <div className="text-xs text-medical-400 uppercase tracking-wider">Symptoms</div>
-                    <div className="text-sm text-medical-700 max-w-[200px] truncate">
+                    <div className="text-xs text-slate-500 uppercase tracking-wider">Symptoms</div>
+                    <div className="text-sm text-slate-300 max-w-[200px] truncate">
                       {pred.symptoms.join(", ")}
                     </div>
                   </div>
@@ -121,39 +121,39 @@ export default function HistoryList({ predictions }: { predictions: Prediction[]
 
               {/* Expanded Details View */}
               {isExpanded && (
-                <div className="px-5 pb-5 border-t border-medical-100 bg-medical-50/30 animate-in slide-in-from-top-2 duration-200">
+                <div className="px-5 pb-5 border-t border-slate-700 bg-slate-900/60 animate-in slide-in-from-top-2 duration-200">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
                     
                     {/* Health Snapshot */}
                     <div>
-                      <h4 className="text-sm font-bold text-medical-900 mb-3 flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-slate-100 mb-3 flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-blue-500"></span>
                         Health Snapshot
                       </h4>
-                      <div className="bg-white p-3 rounded-lg border border-medical-200 grid grid-cols-2 gap-y-2 text-sm">
-                        <div className="text-medical-500">Age/Gender:</div>
-                        <div className="text-medical-900 font-medium">{pred.age} / {pred.gender}</div>
+                      <div className="bg-slate-800 p-3 rounded-lg border border-slate-700 grid grid-cols-2 gap-y-2 text-sm">
+                        <div className="text-slate-400">Age/Gender:</div>
+                        <div className="text-slate-100 font-medium">{pred.age} / {pred.gender}</div>
                         
-                        <div className="text-medical-500">Weight:</div>
-                        <div className="text-medical-900 font-medium">{pred.weight} kg</div>
+                        <div className="text-slate-400">Weight:</div>
+                        <div className="text-slate-100 font-medium">{pred.weight} kg</div>
                         
-                        <div className="text-medical-500">Blood Pressure:</div>
-                        <div className="text-medical-900 font-medium">
+                        <div className="text-slate-400">Blood Pressure:</div>
+                        <div className="text-slate-100 font-medium">
                           {pred.bloodPressureSystolic}/{pred.bloodPressureDiastolic} mmHg
                         </div>
                         
-                        <div className="text-medical-500">Glucose:</div>
-                        <div className="text-medical-900 font-medium">{pred.glucose} mg/dL</div>
+                        <div className="text-slate-400">Glucose:</div>
+                        <div className="text-slate-100 font-medium">{pred.glucose} mg/dL</div>
                         
-                        <div className="text-medical-500">Cholesterol:</div>
-                        <div className="text-medical-900 font-medium">{pred.cholesterol} mg/dL</div>
+                        <div className="text-slate-400">Cholesterol:</div>
+                        <div className="text-slate-100 font-medium">{pred.cholesterol} mg/dL</div>
                       </div>
                       
                       <div className="mt-4">
-                        <h4 className="text-sm font-bold text-medical-900 mb-2">Reported Symptoms</h4>
+                        <h4 className="text-sm font-bold text-slate-100 mb-2">Reported Symptoms</h4>
                         <div className="flex flex-wrap gap-2">
                           {pred.symptoms.map((s, i) => (
-                            <span key={i} className="px-2 py-1 bg-white border border-medical-200 rounded text-xs text-medical-700">
+                            <span key={i} className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs text-slate-200">
                               {s}
                             </span>
                           ))}
@@ -163,22 +163,22 @@ export default function HistoryList({ predictions }: { predictions: Prediction[]
 
                     {/* AI Insights */}
                     <div>
-                      <h4 className="text-sm font-bold text-medical-900 mb-3 flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-slate-100 mb-3 flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-purple-500"></span>
                         AI Insights
                       </h4>
                       {explanation && (
-                        <div className="mb-4 text-sm text-medical-700 leading-relaxed bg-white p-3 rounded-lg border border-medical-200">
+                        <div className="mb-4 text-sm text-slate-200 leading-relaxed bg-slate-800 p-3 rounded-lg border border-slate-700">
                           {explanation}
                         </div>
                       )}
                       
                       {precautions.length > 0 && (
                         <div>
-                          <h5 className="text-xs font-semibold text-medical-500 uppercase tracking-wider mb-2">Recommended Actions</h5>
+                          <h5 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Recommended Actions</h5>
                           <ul className="space-y-1">
                             {precautions.slice(0, 3).map((p, i) => (
-                              <li key={i} className="text-sm text-medical-700 flex items-start gap-2">
+                              <li key={i} className="text-sm text-slate-200 flex items-start gap-2">
                                 <span className="text-green-500 mt-0.5">✓</span>
                                 {p}
                               </li>

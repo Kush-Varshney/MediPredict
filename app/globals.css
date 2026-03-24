@@ -1,3 +1,61 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-950 text-slate-100 antialiased;
+    background-image:
+      radial-gradient(circle at 10% 10%, rgba(20, 184, 166, 0.18), transparent 30%),
+      radial-gradient(circle at 90% 20%, rgba(59, 130, 246, 0.2), transparent 35%),
+      radial-gradient(circle at 50% 90%, rgba(139, 92, 246, 0.12), transparent 30%);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+}
+
+@layer components {
+  .premium-bg {
+    position: relative;
+  }
+
+  .premium-bg::before,
+  .premium-bg::after {
+    content: "";
+    position: absolute;
+    inset: auto;
+    width: 28rem;
+    height: 28rem;
+    border-radius: 9999px;
+    filter: blur(60px);
+    opacity: 0.22;
+    pointer-events: none;
+    animation: floatGlow 12s ease-in-out infinite;
+  }
+
+  .premium-bg::before {
+    background: linear-gradient(135deg, #14b8a6, #3b82f6);
+    top: -8rem;
+    right: -8rem;
+  }
+
+  .premium-bg::after {
+    background: linear-gradient(135deg, #8b5cf6, #14b8a6);
+    bottom: -8rem;
+    left: -8rem;
+    animation-delay: 2.5s;
+  }
+
+  .glass-panel {
+    @apply bg-slate-900/70 border border-slate-700/60 backdrop-blur-xl shadow-2xl;
+  }
+}
+
+@keyframes floatGlow {
+  0%, 100% {
+    transform: translateY(0px) translateX(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-8px) translateX(6px) scale(1.05);
+  }
+}

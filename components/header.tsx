@@ -22,16 +22,16 @@ export default function Header() {
   }
 
   return (
-    <header className="bg-white shadow-sm border-b border-medical-200">
+    <header className="bg-slate-950/80 backdrop-blur-xl border-b border-slate-800">
       <div className="container mx-auto px-4 py-6">
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition">
-            <div className="w-10 h-10 bg-gradient-to-br from-medical-600 to-medical-700 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-teal-500 rounded-lg flex items-center justify-center shadow-[0_0_16px_rgba(45,212,191,0.35)]">
               <span className="text-white font-bold text-lg">M</span>
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-medical-900">MediPredict</h1>
-              <p className="text-sm text-medical-500">AI-Powered Health Insights</p>
+              <h1 className="text-2xl font-bold text-slate-100">MediPredict</h1>
+              <p className="text-sm text-slate-400">AI-Powered Health Insights</p>
             </div>
           </Link>
           <div className="flex items-center gap-4">
@@ -40,12 +40,12 @@ export default function Header() {
                 <Link href="/dashboard">
                   <Button
                     variant="outline"
-                    className="text-medical-600 border-medical-200 hover:bg-medical-50 bg-transparent"
+                    className="text-slate-200 border-slate-700 hover:bg-slate-800 bg-transparent"
                   >
                     Dashboard
                   </Button>
                 </Link>
-                <Button onClick={handleLogout} className="bg-medical-600 hover:bg-medical-700 text-white">
+                <Button onClick={handleLogout}>
                   Logout
                 </Button>
               </>
@@ -54,7 +54,7 @@ export default function Header() {
                 <Link href="/auth/login">
                   <Button
                     variant="outline"
-                    className="text-medical-600 border-medical-200 hover:bg-medical-50 bg-transparent"
+                    className="text-slate-200 border-slate-700 hover:bg-slate-800 bg-transparent"
                   >
                     Sign In
                   </Button>
@@ -65,7 +65,7 @@ export default function Header() {
               </>
             )}
             <div className="text-right hidden md:block">
-              <p className="text-sm text-medical-600">Powered by Advanced ML & Gemini AI</p>
+              <p className="text-sm text-slate-400">Powered by Advanced ML & Gemini AI</p>
             </div>
           </div>
         </div>

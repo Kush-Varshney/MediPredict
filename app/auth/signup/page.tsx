@@ -69,27 +69,50 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-medical-50 to-medical-100 flex items-center justify-center px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-2">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-10 h-10 bg-gradient-to-br from-medical-600 to-medical-700 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold">M</span>
+    <div className="min-h-screen premium-bg px-4 py-10">
+      <div className="mx-auto max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
+        <Card className="glass-panel p-8 flex flex-col justify-between">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-teal-400/40 bg-teal-400/10 px-3 py-1 text-xs text-teal-200 mb-5">
+              Build your AI health profile
             </div>
-            <h1 className="text-2xl font-bold text-medical-900">MediPredict</h1>
+            <h1 className="text-4xl font-bold text-white leading-tight">Create your MediPredict account</h1>
+            <p className="text-slate-300 mt-4">
+              Get intelligent, explainable predictions and a timeline of your health insights in one secure workspace.
+            </p>
           </div>
-          <CardTitle>Create Account</CardTitle>
-          <CardDescription>Join MediPredict to track your health predictions</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-3 mt-8">
+            {[
+              "Actionable recommendations based on symptoms and metrics",
+              "Professional dashboard with risk-focused visualization",
+              "History-driven monitoring for better follow-up decisions",
+            ].map((point) => (
+              <div key={point} className="rounded-lg border border-slate-700 bg-slate-800/70 p-3 text-sm text-slate-200">
+                {point}
+              </div>
+            ))}
+          </div>
+        </Card>
+        <Card className="glass-panel w-full">
+          <CardHeader className="space-y-2">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-teal-500 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold">M</span>
+              </div>
+              <h1 className="text-2xl font-bold text-white">MediPredict</h1>
+            </div>
+            <CardTitle>Create Account</CardTitle>
+            <CardDescription>Start with a modern, trustworthy AI-assisted health experience</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-medical-900">Full Name</label>
+              <label className="text-sm font-medium text-slate-200">Full Name</label>
               <Input
                 type="text"
                 name="name"
@@ -101,7 +124,7 @@ export default function SignupPage() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-medical-900">Email</label>
+              <label className="text-sm font-medium text-slate-200">Email</label>
               <Input
                 type="email"
                 name="email"
@@ -113,7 +136,7 @@ export default function SignupPage() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-medical-900">Password</label>
+              <label className="text-sm font-medium text-slate-200">Password</label>
               <Input
                 type="password"
                 name="password"
@@ -125,7 +148,7 @@ export default function SignupPage() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-medical-900">Confirm Password</label>
+              <label className="text-sm font-medium text-slate-200">Confirm Password</label>
               <Input
                 type="password"
                 name="confirmPassword"
@@ -141,13 +164,14 @@ export default function SignupPage() {
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">
-            <span className="text-medical-600">Already have an account? </span>
-            <Link href="/auth/login" className="text-medical-600 font-semibold hover:text-medical-700">
+            <span className="text-slate-400">Already have an account? </span>
+            <Link href="/auth/login" className="text-cyan-300 font-semibold hover:text-cyan-200">
               Sign in
             </Link>
           </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

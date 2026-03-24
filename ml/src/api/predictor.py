@@ -1,6 +1,6 @@
 import numpy as np
 import joblib
-from typing import Dict, List
+from typing import Dict, List, Optional
 import logging
 import os
 
@@ -42,6 +42,93 @@ class DiseasePredictor:
             'glucose', 'cholesterol'
         ]
 
+    def _clamp(self, value: Optional[float], low: float, high: float) -> Optional[float]:
+        if value is None:
+            return None
+        try:
+            num = float(value)
+        except Exception:
+            return None
+        if not np.isfinite(num):
+            return None
+        return min(max(num, low), high)
+
+    def _compute_metric_assessment(self, data: Dict) -> Dict:
+        glucose = self._clamp(data.get("glucose"), 0, 10000)
+        systolic = self._clamp(data.get("blood_pressure_systolic"), 0, 10000)
+        diastolic = self._clamp(data.get("blood_pressure_diastolic"), 0, 10000)
+        cholesterol = self._clamp(data.get("cholesterol"), 0, 10000)
+
+        glucose_band = "unknown"
+        if glucose is not None:
+            if glucose >= 126:
+                glucose_band = "diabetes_range"
+            elif glucose >= 100:
+                glucose_band = "prediabetes_range"
+            else:
+                glucose_band = "normal"
+
+        blood_pressure_band = "unknown"
+        if systolic is not None and diastolic is not None:
+            if systolic >= 140 or diastolic >= 90:
+                blood_pressure_band = "hypertension_stage_2"
+            elif systolic >= 130 or diastolic >= 80:
+                blood_pressure_band = "hypertension_stage_1"
+            elif systolic >= 120 and diastolic < 80:
+                blood_pressure_band = "elevated"
+            else:
+                blood_pressure_band = "normal"
+
+        cholesterol_band = "unknown"
+        if cholesterol is not None:
+            if cholesterol >= 240:
+                cholesterol_band = "high"
+            elif cholesterol >= 200:
+                cholesterol_band = "borderline_high"
+            else:
+                cholesterol_band = "desirable"
+
+        risk_score = 0
+        if glucose_band == "prediabetes_range":
+            risk_score += 1
+        elif glucose_band == "diabetes_range":
+            risk_score += 2
+
+        if blood_pressure_band == "elevated":
+            risk_score += 1
+        elif blood_pressure_band in {"hypertension_stage_1", "hypertension_stage_2"}:
+            risk_score += 2 if blood_pressure_band == "hypertension_stage_1" else 3
+
+        if cholesterol_band == "borderline_high":
+            risk_score += 1
+        elif cholesterol_band == "high":
+            risk_score += 2
+
+        if risk_score >= 5:
+            clinical_risk = "High"
+        elif risk_score >= 2:
+            clinical_risk = "Medium"
+        else:
+            clinical_risk = "Low"
+
+        alerts = []
+        if glucose_band == "prediabetes_range":
+            alerts.append("Glucose suggests possible prediabetes range (100-125 mg/dL).")
+        elif glucose_band == "diabetes_range":
+            alerts.append("Glucose is in diabetes-risk range (>=126 mg/dL).")
+        if blood_pressure_band in {"hypertension_stage_1", "hypertension_stage_2"}:
+            alerts.append("Blood pressure is above normal range.")
+        if cholesterol_band in {"borderline_high", "high"}:
+            alerts.append("Total cholesterol is above desirable range.")
+
+        return {
+            "glucose_band": glucose_band,
+            "blood_pressure_band": blood_pressure_band,
+            "cholesterol_band": cholesterol_band,
+            "clinical_risk": clinical_risk,
+            "alerts": alerts
+        }
+
     def predict(self, data: Dict) -> Dict:
         """
         Make prediction on input data
@@ -52,8 +139,28 @@ class DiseasePredictor:
         Returns:
             Dictionary with prediction, confidence, and risk level
         """
+        def _metric_value(key: str):
+            val = data.get(key, None)
+            if val is None:
+                return np.nan
+            try:
+                num = float(val)
+            except Exception:
+                return np.nan
+            return num if np.isfinite(num) else np.nan
+
+        metric_keys = [
+            "blood_pressure_systolic",
+            "blood_pressure_diastolic",
+            "glucose",
+            "cholesterol",
+        ]
+        available_metric_count = sum(1 for k in metric_keys if data.get(k, None) is not None)
+
         # If we have a symptom vocabulary and symptoms are provided, use symptom vector path
         used_symptoms_path = False
+        matched = []
+        unmatched = []
         if self.symptom_vocabulary and isinstance(data.get('symptoms'), list):
             import re as _re
 
@@ -92,8 +199,6 @@ class DiseasePredictor:
             
             feature_vec = np.zeros(len(self.symptom_vocabulary), dtype=float)
             
-            matched = []
-            unmatched = []
             for s in data.get('symptoms', []):
                 if not s:
                     continue
@@ -124,25 +229,25 @@ class DiseasePredictor:
                 used_symptoms_path = False
                 logger.warning(f"[Predict] No symptoms matched vocabulary, falling back to vitals path. Unmatched: {unmatched}")
                 features = np.array([
-                    data.get('age', 0),
-                    data.get('gender', 0),
-                    data.get('weight', 0),
-                    data.get('blood_pressure_systolic', 0),
-                    data.get('blood_pressure_diastolic', 0),
-                    data.get('glucose', 0),
-                    data.get('cholesterol', 0)
+                    float(data.get('age', 0)),
+                    float(data.get('gender', 0)),
+                    float(data.get('weight', 0)),
+                    _metric_value('blood_pressure_systolic'),
+                    _metric_value('blood_pressure_diastolic'),
+                    _metric_value('glucose'),
+                    _metric_value('cholesterol')
                 ]).reshape(1, -1)
         else:
             logger.info(f"[Predict] Symptom vocabulary available: {bool(self.symptom_vocabulary)}, symptoms provided: {bool(data.get('symptoms'))}")
             logger.info("[Predict] Using vitals path")
             features = np.array([
-                data.get('age', 0),
-                data.get('gender', 0),
-                data.get('weight', 0),
-                data.get('blood_pressure_systolic', 0),
-                data.get('blood_pressure_diastolic', 0),
-                data.get('glucose', 0),
-                data.get('cholesterol', 0)
+                float(data.get('age', 0)),
+                float(data.get('gender', 0)),
+                float(data.get('weight', 0)),
+                _metric_value('blood_pressure_systolic'),
+                _metric_value('blood_pressure_diastolic'),
+                _metric_value('glucose'),
+                _metric_value('cholesterol')
             ]).reshape(1, -1)
         
         # Scale features if scaler available (only for vitals path)
@@ -153,16 +258,13 @@ class DiseasePredictor:
                 # If scaler shape mismatches (e.g., symptom path), skip scaling
                 pass
         
-        # Validate we have any usable signal; if not, return clear 400 via Flask handler
-        try:
-            from numpy import isfinite as _isfinite
-            if not used_symptoms_path:
-                # If vitals are all zeros or non-finite, reject
-                if float(np.nansum(features)) == 0.0 or not bool(np.all(_isfinite(features))):
-                    raise ValueError("No valid symptoms matched vocabulary and vitals are missing. Please add symptoms or vitals.")
-        except Exception:
-            # Non-fatal
-            pass
+        # Validate we have any usable signal; let Flask return actionable 400 on failure
+        from numpy import isfinite as _isfinite
+        if not used_symptoms_path:
+            if available_metric_count < len(metric_keys):
+                raise ValueError("For metric-based prediction, provide BP, glucose, and cholesterol values or add recognized symptoms.")
+            if float(np.nansum(features)) == 0.0 or not bool(np.all(_isfinite(features))):
+                raise ValueError("No valid symptoms matched vocabulary and vitals are missing. Please add symptoms or vitals.")
         
         # Make prediction
         prediction = self.model.predict(features)[0]
@@ -174,10 +276,12 @@ class DiseasePredictor:
                 probabilities = self.model.predict_proba(features)[0]
             except Exception:
                 probabilities = None
-        confidence = float(np.max(probabilities)) if probabilities is not None else 0.85
+        confidence = float(np.max(probabilities)) if probabilities is not None else None
+        confidence = self._clamp(confidence, 0.0, 1.0)
+        confidence_source = "model_proba" if confidence is not None else "unavailable"
         
         # Determine risk level
-        risk_level = self._calculate_risk_level(confidence)
+        risk_level = self._calculate_risk_level(confidence if confidence is not None else 0.0)
         
         # Map prediction to disease label if encoder available
         predicted_label = None
@@ -213,16 +317,57 @@ class DiseasePredictor:
             except Exception:
                 top_k = []
 
-        # Count matched symptoms if symptoms path used
-        matched_symptoms = int(features.sum()) if used_symptoms_path else 0
+        # Count matched symptoms and symptom evidence
+        matched_symptoms = len(matched) if used_symptoms_path else 0
+        total_symptoms = len(data.get("symptoms", []) or [])
+        match_rate = (matched_symptoms / total_symptoms) if total_symptoms > 0 else 0.0
+
+        uncertainty = {}
+        if probabilities is not None and len(probabilities) > 1:
+            sorted_probs = np.sort(probabilities)[::-1]
+            margin = float(sorted_probs[0] - sorted_probs[1])
+            entropy = float(-np.sum(probabilities * np.log(np.clip(probabilities, 1e-12, 1.0))))
+            uncertainty = {
+                "top1_top2_margin": round(margin, 4),
+                "entropy": round(entropy, 4),
+                "uncertainty_level": "High" if margin < 0.1 else ("Medium" if margin < 0.2 else "Low")
+            }
+        else:
+            uncertainty = {
+                "top1_top2_margin": None,
+                "entropy": None,
+                "uncertainty_level": "Unknown"
+            }
+
+        metric_assessment = self._compute_metric_assessment(data)
+        confidence_percent = round(confidence * 100.0, 2) if confidence is not None else None
+        analysis_mode = (
+            "symptom_plus_metrics"
+            if used_symptoms_path and available_metric_count > 0
+            else "symptom_only"
+            if used_symptoms_path
+            else "metrics_only"
+        )
         return {
             'predicted_disease': predicted_label if predicted_label is not None else str(prediction),
             'disease_code': int(prediction),
-            'confidence': round(confidence, 4),
-            'confidence_percent': round(confidence * 100.0, 2),
+            'confidence': round(confidence, 4) if confidence is not None else None,
+            'confidence_percent': confidence_percent,
+            'confidence_source': confidence_source,
             'risk_level': risk_level,
+            'clinical_risk': metric_assessment.get("clinical_risk", "Unknown"),
+            'analysis_mode': analysis_mode,
+            'metrics_used_count': available_metric_count,
             'used_symptoms_path': bool(used_symptoms_path),
             'matched_symptoms': matched_symptoms,
+            'symptom_evidence': {
+                "matched": matched,
+                "unmatched": unmatched,
+                "match_rate": round(match_rate, 4),
+                "total_reported": total_symptoms
+            },
+            'metric_assessment': metric_assessment,
+            'uncertainty': uncertainty,
             'model_type': type(self.model).__name__,
             'top_k': top_k,
             'timestamp': str(np.datetime64('now'))

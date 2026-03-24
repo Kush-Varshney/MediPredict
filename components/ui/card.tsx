@@ -3,7 +3,7 @@
 import React from "react"
 
 export const Card: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className = "", ...props }) => (
-  <div className={`rounded-lg border bg-white ${className}`} {...props} />
+  <div className={`rounded-xl border border-slate-700/70 bg-slate-900/70 backdrop-blur-md shadow-xl ${className}`} {...props} />
 )
 
 export const CardHeader: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className = "", ...props }) => (
@@ -11,11 +11,11 @@ export const CardHeader: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ cla
 )
 
 export const CardTitle: React.FC<React.HTMLAttributes<HTMLHeadingElement>> = ({ className = "", ...props }) => (
-  <h3 className={`text-xl font-semibold leading-none tracking-tight ${className}`} {...props} />
+  <h3 className={`text-xl font-semibold leading-none tracking-tight text-slate-100 ${className}`} {...props} />
 )
 
 export const CardDescription: React.FC<React.HTMLAttributes<HTMLParagraphElement>> = ({ className = "", ...props }) => (
-  <p className={`text-sm text-medical-600 ${className}`} {...props} />
+  <p className={`text-sm text-slate-400 ${className}`} {...props} />
 )
 
 export const CardContent: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className = "", ...props }) => (

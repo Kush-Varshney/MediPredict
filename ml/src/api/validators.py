@@ -40,59 +40,37 @@ def validate_prediction_input(data):
     Raises:
         ValueError: If validation fails
     """
-    # If symptoms-only mode (list of strings), allow skipping vitals
     symptoms = data.get('symptoms', [])
-    symptoms_only = isinstance(symptoms, list) and (len(symptoms) > 0) and isinstance(symptoms[0], (str,))
 
-    if not symptoms_only:
-        required_fields = [
-            'age', 'gender', 'weight',
-            'blood_pressure_systolic', 'blood_pressure_diastolic',
-            'glucose', 'cholesterol'
-        ]
-        # Check required fields for vitals path
-        for field in required_fields:
-            if field not in data:
-                raise ValueError(f"Missing required field: {field}")
-    
-    if not symptoms_only:
-        # Validate age
-        age = data.get('age')
-        if not isinstance(age, (int, float)) or age < 0 or age > 150:
-            raise ValueError("Age must be a number between 0 and 150")
-    
-    if not symptoms_only:
-        # Validate gender
-        gender = data.get('gender')
-        if gender not in [0, 1]:
-            raise ValueError("Gender must be 0 (Female) or 1 (Male)")
-    
-    if not symptoms_only:
-        # Validate weight
-        weight = data.get('weight')
-        if not isinstance(weight, (int, float)) or weight < 1 or weight > 300:
-            raise ValueError("Weight must be between 1 and 300 kg")
-    
-    if not symptoms_only:
-        # Validate blood pressure
-        sys_bp = data.get('blood_pressure_systolic')
-        dia_bp = data.get('blood_pressure_diastolic')
-        if not isinstance(sys_bp, (int, float)) or sys_bp < 60 or sys_bp > 250:
-            raise ValueError("Systolic BP must be between 60 and 250")
-        if not isinstance(dia_bp, (int, float)) or dia_bp < 30 or dia_bp > 150:
-            raise ValueError("Diastolic BP must be between 30 and 150")
-    
-    if not symptoms_only:
-        # Validate glucose
-        glucose = data.get('glucose')
-        if not isinstance(glucose, (int, float)) or glucose < 20 or glucose > 600:
-            raise ValueError("Glucose must be between 20 and 600 mg/dL")
-    
-    if not symptoms_only:
-        # Validate cholesterol
-        cholesterol = data.get('cholesterol')
-        if not isinstance(cholesterol, (int, float)) or cholesterol < 40 or cholesterol > 600:
-            raise ValueError("Cholesterol must be between 40 and 600 mg/dL")
+    age = data.get('age')
+    if not isinstance(age, (int, float)) or age < 0 or age > 150:
+        raise ValueError("Age must be a number between 0 and 150")
+
+    gender = data.get('gender')
+    if gender not in [0, 0.5, 1]:
+        raise ValueError("Gender must be 0 (Female), 1 (Male), or 0.5 (Other)")
+
+    weight = data.get('weight')
+    if not isinstance(weight, (int, float)) or weight < 1 or weight > 300:
+        raise ValueError("Weight must be between 1 and 300 kg")
+
+    # Optional metrics: null/omitted means unknown and should not fail validation
+    sys_bp = data.get('blood_pressure_systolic')
+    dia_bp = data.get('blood_pressure_diastolic')
+    if (sys_bp is None) != (dia_bp is None):
+        raise ValueError("Provide both systolic and diastolic BP, or leave both unknown")
+    if sys_bp is not None and (not isinstance(sys_bp, (int, float)) or sys_bp < 60 or sys_bp > 250):
+        raise ValueError("Systolic BP must be between 60 and 250")
+    if dia_bp is not None and (not isinstance(dia_bp, (int, float)) or dia_bp < 30 or dia_bp > 150):
+        raise ValueError("Diastolic BP must be between 30 and 150")
+
+    glucose = data.get('glucose')
+    if glucose is not None and (not isinstance(glucose, (int, float)) or glucose < 20 or glucose > 600):
+        raise ValueError("Glucose must be between 20 and 600 mg/dL")
+
+    cholesterol = data.get('cholesterol')
+    if cholesterol is not None and (not isinstance(cholesterol, (int, float)) or cholesterol < 40 or cholesterol > 600):
+        raise ValueError("Cholesterol must be between 40 and 600 mg/dL")
     
     symptoms = data.get('symptoms', [])
     if symptoms:

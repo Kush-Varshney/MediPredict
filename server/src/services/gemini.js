@@ -1,5 +1,13 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai")
 
+function clamp01(value) {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return null
+  if (n < 0) return 0
+  if (n > 1) return 1
+  return n
+}
+
 function withTimeout(promise, timeoutMs = 10000) {
   return Promise.race([
     promise,
@@ -186,17 +194,43 @@ Response Format (JSON ONLY):
     const parsed = JSON.parse(jsonMatch[0]);
     
     // Normalize structure to match ML service
+    const parsedConfidence = clamp01(parsed.confidence)
+    const safeConfidence = parsedConfidence === null ? 0.5 : parsedConfidence
+    const metricsProvided = [
+      healthData.bloodPressureSystolic,
+      healthData.bloodPressureDiastolic,
+      healthData.glucose,
+      healthData.cholesterol,
+    ].filter((v) => v !== null && v !== undefined).length
+
     return {
       predicted_disease: parsed.predicted_disease || "Unknown Condition",
-      confidence: parsed.confidence || 0.5,
-      confidence_percent: (parsed.confidence || 0.5) * 100,
+      confidence: safeConfidence,
+      confidence_percent: safeConfidence * 100,
+      confidence_source: "llm_estimate",
       risk_level: parsed.risk_level || "Medium",
+      clinical_risk: parsed.risk_level || "Medium",
       precautions: Array.isArray(parsed.precautions) ? parsed.precautions : [],
       diet: Array.isArray(parsed.diet) ? parsed.diet : [],
       ai_explanation: parsed.explanation || "",
       used_symptoms_path: false,
-      matched_symptoms: Array.isArray(healthData.symptoms) ? healthData.symptoms.length : 0,
-      model_type: "gemini-fallback"
+      matched_symptoms: 0,
+      symptom_evidence: {
+        matched: [],
+        unmatched: Array.isArray(healthData.symptoms) ? healthData.symptoms : [],
+        match_rate: 0,
+        total_reported: Array.isArray(healthData.symptoms) ? healthData.symptoms.length : 0,
+      },
+      metric_assessment: {},
+      uncertainty: {
+        top1_top2_margin: null,
+        entropy: null,
+        uncertainty_level: "High",
+      },
+      analysis_mode: metricsProvided > 0 ? "symptom_plus_metrics" : "symptom_only",
+      metrics_used_count: metricsProvided,
+      model_type: "gemini-fallback",
+      prediction_source: "llm_fallback",
     };
 
   } catch (error) {
@@ -204,15 +238,23 @@ Response Format (JSON ONLY):
     // Return a safe default if even Gemini fails
     return {
       predicted_disease: "Medical Consultation Required",
-      confidence: 0,
-      confidence_percent: 0,
+      confidence: null,
+      confidence_percent: null,
+      confidence_source: "unavailable",
       risk_level: "Unknown",
+      clinical_risk: "Unknown",
       precautions: ["Consult a doctor immediately", "Monitor symptoms"],
       diet: ["Maintain balanced diet"],
       ai_explanation: "Automated analysis failed. Please consult a healthcare professional directly.",
       used_symptoms_path: false,
       matched_symptoms: 0,
-      model_type: "failure-fallback"
+      symptom_evidence: { matched: [], unmatched: [], match_rate: 0, total_reported: 0 },
+      metric_assessment: {},
+      uncertainty: { top1_top2_margin: null, entropy: null, uncertainty_level: "Unknown" },
+      analysis_mode: "symptom_only",
+      metrics_used_count: 0,
+      model_type: "failure-fallback",
+      prediction_source: "failure_fallback",
     };
   }
 }

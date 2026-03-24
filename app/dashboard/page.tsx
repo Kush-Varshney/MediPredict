@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -13,6 +13,7 @@ import ErrorBoundary from "@/components/error-boundary"
 import HealthTrends from "@/components/health-trends"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { retryFetch, parseJsonSafe } from "@/lib/http"
+import { scrollToElementWithOffset } from "@/lib/scroll"
 import PredictionSuccessModal from "@/components/prediction-success-modal"
 import HistoryList from "@/components/history-list"
 
@@ -33,6 +34,7 @@ export default function DashboardPage() {
   // Modal state
   const [successModalOpen, setSuccessModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("predict")
+  const resultsSectionRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     // Check authentication
@@ -70,10 +72,10 @@ export default function DashboardPage() {
     age: number
     gender: "M" | "F" | "Other"
     weight: number
-    bloodPressureSystolic: number
-    bloodPressureDiastolic: number
-    glucose: number
-    cholesterol: number
+    bloodPressureSystolic: number | null
+    bloodPressureDiastolic: number | null
+    glucose: number | null
+    cholesterol: number | null
     symptoms: string[]
   }) => {
     setSymptoms(payload.symptoms)
@@ -107,19 +109,20 @@ export default function DashboardPage() {
             .filter(Boolean)
             .join(" \u2022 "),
         )
-        setCurrentPrediction(data)
         return
       }
 
       setCurrentPrediction(data)
-      
+
       // Refresh history first to ensure it's up to date
       await fetchPredictionHistory()
-      
-      // Open success modal instead of setting notice string
+
       setSuccessModalOpen(true)
+      requestAnimationFrame(() => {
+        scrollToElementWithOffset(resultsSectionRef.current, 120)
+      })
     } catch (error) {
-      console.error("[v0] Prediction error:", error)
+      console.error("Prediction error:", error)
       setError(
         error instanceof Error
           ? error.message
@@ -143,19 +146,19 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-medical-50 to-medical-100">
+    <div className="min-h-screen premium-bg">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-medical-200">
+      <header className="bg-slate-950/80 backdrop-blur-xl border-b border-slate-800">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-medical-600 to-medical-700 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-teal-500 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold">M</span>
             </div>
-            <h1 className="text-2xl font-bold text-medical-900">MediPredict</h1>
+            <h1 className="text-2xl font-bold text-slate-100">MediPredict</h1>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-medical-600">Welcome, {user.name}</span>
-            <Button variant="outline" onClick={handleLogout}>
+            <span className="text-slate-300">Welcome, {user.name}</span>
+            <Button variant="outline" onClick={handleLogout} className="border-slate-700 text-slate-200">
               Logout
             </Button>
           </div>
@@ -171,11 +174,17 @@ export default function DashboardPage() {
           </TabsList>
 
           <TabsContent value="predict" className="space-y-6">
+            <div className="rounded-xl border border-slate-700 bg-slate-900/70 p-5">
+              <h2 className="text-2xl font-bold text-slate-100">Clinical Prediction Workspace</h2>
+              <p className="text-slate-400 mt-1">
+                Add symptoms and optional metrics, then review explainable probabilities and risk-stratified insights.
+              </p>
+            </div>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-1">
                 <SymptomForm onSubmit={handleSubmit} loading={loading} />
               </div>
-              <div className="lg:col-span-2">
+              <div ref={resultsSectionRef} className="lg:col-span-2 scroll-mt-28 md:scroll-mt-32">
                 {error && !loading && (
                   <Alert variant="destructive" className="mb-4">
                     <AlertDescription>{error}</AlertDescription>
@@ -183,10 +192,10 @@ export default function DashboardPage() {
                 )}
                 {/* Notice Alert removed in favor of Modal */}
                 {loading && (
-                  <div className="flex items-center justify-center h-96 bg-white rounded-lg shadow-lg">
+                  <div className="flex items-center justify-center h-96 bg-slate-900/70 border border-slate-700 rounded-lg shadow-lg">
                     <div className="text-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-medical-600 mx-auto mb-4"></div>
-                      <p className="text-medical-600 font-medium">Analyzing symptoms...</p>
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400 mx-auto mb-4"></div>
+                      <p className="text-slate-200 font-medium">Analyzing symptoms...</p>
                     </div>
                   </div>
                 )}
@@ -197,10 +206,10 @@ export default function DashboardPage() {
                   </ErrorBoundary>
                 )}
                 {!currentPrediction && !loading && (
-                  <div className="bg-white rounded-lg shadow-lg p-8 text-center h-96 flex items-center justify-center">
+                  <div className="bg-slate-900/70 border border-slate-700 rounded-lg shadow-lg p-8 text-center h-96 flex items-center justify-center">
                     <div>
-                      <p className="text-medical-600 text-lg font-medium">Enter your symptoms to get started</p>
-                      <p className="text-medical-400 mt-2">
+                      <p className="text-slate-200 text-lg font-medium">Enter your symptoms to get started</p>
+                      <p className="text-slate-400 mt-2">
                         Our AI will analyze your symptoms and provide health insights
                       </p>
                     </div>
