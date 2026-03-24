@@ -9,7 +9,7 @@ interface PredictionResultsProps {
 
 export default function PredictionResults({ prediction, symptoms }: PredictionResultsProps) {
   const topCondition = prediction
-  const safeSymptoms = Array.isArray(symptoms) ? symptoms : symptoms ? [String(symptoms)] : []
+  const rawSymptoms = Array.isArray(symptoms)  ? symptoms  : symptoms  ? [String(symptoms)]  : []
 
   if (!topCondition || typeof topCondition !== "object") {
     return (
@@ -58,6 +58,13 @@ export default function PredictionResults({ prediction, symptoms }: PredictionRe
     inputSnapshot.bloodPressureDiastolic !== undefined
   const glucoseKnown = inputSnapshot.glucose !== null && inputSnapshot.glucose !== undefined
   const cholesterolKnown = inputSnapshot.cholesterol !== null && inputSnapshot.cholesterol !== undefined
+
+  // 🔥 Filter out unmatched symptoms (MAIN FIX)
+  const unmatched = Array.isArray(symptomEvidence?.unmatched)
+    ? symptomEvidence.unmatched
+    : []
+
+  const safeSymptoms = rawSymptoms.filter((s) => !unmatched.includes(s))
 
   return (
     <Card className="bg-slate-900/70 shadow-lg border-slate-700 mb-6">
@@ -118,7 +125,7 @@ export default function PredictionResults({ prediction, symptoms }: PredictionRe
               <p className="text-xs text-slate-400">Analysis Mode</p>
               <p className="text-sm font-semibold text-slate-200">{String(analysisMode).replaceAll("_", " ")}</p>
               <p className="text-xs text-slate-400 mt-1">
-                Data used: Symptoms, BP {bpKnown ? "provided" : "unknown"}, Glucose {glucoseKnown ? "provided" : "unknown"},
+                Data used: Symptoms, BP {bpKnown ? "provided" : "unknown"}, {" "}Glucose {glucoseKnown ? "provided" : "unknown"},
                 {" "}Cholesterol {cholesterolKnown ? "provided" : "unknown"}
               </p>
             </div>
@@ -127,39 +134,36 @@ export default function PredictionResults({ prediction, symptoms }: PredictionRe
 
         <div className="mt-4">
           <h3 className="text-lg font-semibold text-slate-100 mb-2">Provided Symptoms</h3>
-          <div className="flex flex-wrap gap-2">
-            {safeSymptoms.map((s) => (
-              <span
-                key={s}
-                className="bg-slate-800 border border-slate-700 px-2 py-1 rounded text-sm text-slate-200"
-              >
-                {s}
-              </span>
-            ))}
-          </div>
+
+          {safeSymptoms.length === 0 ? (
+            <p className="text-sm text-slate-400">
+              No valid symptoms selected.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {safeSymptoms.map((s) => (
+                <span
+                  key={s}
+                  className="bg-slate-800 border border-slate-700 px-2 py-1 rounded text-sm text-slate-200"
+                >
+                  {s}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {!!usedSymptomsPath && matchedSymptoms === 0 && (
           <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
             <p className="text-sm text-yellow-800">
-              None of your selected symptoms matched the model’s vocabulary. The result may rely more on vitals; try
-              selecting different or more specific symptoms.
-            </p>
-          </div>
-        )}
-        {!!Array.isArray(symptomEvidence?.unmatched) && symptomEvidence.unmatched.length > 0 && (
-          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded">
-            <p className="text-sm text-amber-800">
-              Some symptoms could not be mapped to the ML vocabulary: {symptomEvidence.unmatched.slice(0, 4).join(", ")}
-              {symptomEvidence.unmatched.length > 4 ? "..." : ""}.
+              None of your selected symptoms matched the model’s vocabulary. The result may rely more on vitals; try selecting different or more specific symptoms.
             </p>
           </div>
         )}
 
         <div className="mt-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
           <p className="text-sm text-amber-100">
-            <strong>Disclaimer:</strong> This prediction is for informational purposes only and should not replace
-            professional medical advice. Please consult with a healthcare provider for accurate diagnosis and treatment.
+            <strong>Disclaimer:</strong> This prediction is for informational purposes only and should not replace professional medical advice. Please consult with a healthcare provider for accurate diagnosis and treatment.
           </p>
         </div>
       </div>
