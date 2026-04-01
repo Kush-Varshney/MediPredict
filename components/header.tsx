@@ -65,7 +65,7 @@ export default function Header() {
               </>
             )}
             <div className="text-right hidden md:block">
-              <p className="text-sm text-slate-400">Powered by Advanced ML & Gemini AI</p>
+              <p className="text-sm text-slate-400">Powered by Advanced ML</p>
             </div>
           </div>
         </div>
