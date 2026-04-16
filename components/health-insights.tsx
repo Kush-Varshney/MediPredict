@@ -76,9 +76,9 @@ export function HealthInsightsSkeleton() {
 }
 
 export default function HealthInsights({ prediction }: HealthInsightsProps) {
-  const aiExplanation = prediction?.ai_explanation
+  const aiExplanation = prediction?.explanation
   const precautions: string[] = prediction?.precautions || []
-  const diet: string[] = prediction?.diet || []
+  const diet: string[] = prediction?.diet_recommendations || prediction?.diet || []
   const riskLevel: string = prediction?.risk_level || prediction?.riskLevel || ""
   const metricAssessment = prediction?.metric_assessment
   const inputSnapshot = prediction?.input_snapshot || {}

@@ -9,6 +9,7 @@ interface Prediction {
   createdAt: string
   predictedDisease?: string
   predicted_disease?: string
+  primary_concern?: string
   confidencePercent?: number
   confidence_percent?: number
   riskLevel?: string
@@ -22,9 +23,8 @@ interface Prediction {
   glucose?: number
   cholesterol?: number
   precautions?: string[]
-  diet?: string[]
-  aiExplanation?: string
-  ai_explanation?: string
+  diet_recommendations?: string[]
+  explanation?: string
 }
 
 export default function HistoryList({ predictions }: { predictions: Prediction[] }) {
@@ -61,7 +61,7 @@ export default function HistoryList({ predictions }: { predictions: Prediction[]
       {predictions.map((pred, idx) => {
         const id = pred._id || `pred-${idx}`
         const isExpanded = expandedId === id
-        const disease = pred.predictedDisease || pred.predicted_disease || "Unknown"
+        const disease = pred.primary_concern || pred.predictedDisease || pred.predicted_disease || "Unknown"
         const confidence = Math.round(pred.confidencePercent || pred.confidence_percent || 0)
         const risk = pred.riskLevel || pred.risk_level || "Unknown"
         const date = new Date(pred.createdAt).toLocaleDateString(undefined, {
@@ -72,7 +72,7 @@ export default function HistoryList({ predictions }: { predictions: Prediction[]
           hour: '2-digit',
           minute: '2-digit'
         })
-        const explanation = pred.aiExplanation || pred.ai_explanation
+        const explanation = pred.explanation
         const precautions = pred.precautions || []
         
         return (
@@ -161,11 +161,11 @@ export default function HistoryList({ predictions }: { predictions: Prediction[]
                       </div>
                     </div>
 
-                    {/* AI Insights */}
+                    {/* Clinical Insights */}
                     <div>
                       <h4 className="text-sm font-bold text-slate-100 mb-3 flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-purple-500"></span>
-                        AI Insights
+                        Clinical Insights
                       </h4>
                       {explanation && (
                         <div className="mb-4 text-sm text-slate-200 leading-relaxed bg-slate-800 p-3 rounded-lg border border-slate-700">

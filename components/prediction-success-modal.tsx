@@ -22,8 +22,8 @@ export default function PredictionSuccessModal({
   const derived = useMemo(() => {
     if (!prediction || typeof prediction !== "object") return null
 
-    const disease = prediction.predicted_disease || prediction.predictedDisease || "Unknown Condition"
-    const explanation = String(prediction.ai_explanation || prediction.aiExplanation || "").trim()
+    const disease = prediction.primary_concern || prediction.predictedDisease || "Unknown Condition"
+    const explanation = String(prediction.explanation || "").trim()
     const modelType = String(prediction.model_type || prediction.modelType || "").toLowerCase()
     const predictionSource = String(prediction.prediction_source || "").toLowerCase()
     const persisted = prediction.persisted
@@ -74,13 +74,11 @@ export default function PredictionSuccessModal({
     }
 
     const riskLevel = prediction.risk_level || prediction.riskLevel || "Unknown"
-    const clinicalRisk = prediction.clinical_risk || "Unknown"
 
     return {
       disease,
       explanation,
       riskLevel,
-      clinicalRisk,
       confidencePercent,
       confidenceAvailable,
       looksLikeFailure,
@@ -158,14 +156,11 @@ export default function PredictionSuccessModal({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <h4 className="text-xs font-medium text-cyan-400/90 uppercase tracking-wider mb-2">Predicted condition</h4>
+            <h4 className="text-xs font-medium text-cyan-400/90 uppercase tracking-wider mb-2">Primary Clinical Concern</h4>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-2xl font-bold text-slate-100">{derived.disease}</span>
               <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${getRiskBadgeClass(derived.riskLevel)}`}>
                 {derived.riskLevel} risk
-              </span>
-              <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${getRiskBadgeClass(derived.clinicalRisk)}`}>
-                {derived.clinicalRisk} clinical
               </span>
             </div>
           </div>
@@ -191,7 +186,7 @@ export default function PredictionSuccessModal({
             </div>
             <p className="text-xs text-slate-500 mt-2">
               {derived.confidenceAvailable
-                ? "Estimate reflects model or advisory output, not a clinical diagnosis."
+                ? "Confidence indicates model certainty, not a formal diagnosis."
                 : "No reliable score for this run—see full results for context."}
             </p>
           </div>

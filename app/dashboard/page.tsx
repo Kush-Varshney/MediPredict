@@ -177,7 +177,7 @@ export default function DashboardPage() {
             <div className="rounded-xl border border-slate-700 bg-slate-900/70 p-5">
               <h2 className="text-2xl font-bold text-slate-100">Clinical Prediction Workspace</h2>
               <p className="text-slate-400 mt-1">
-                Add symptoms and optional metrics, then review explainable probabilities and risk-stratified insights.
+                Add symptoms and health metrics for a unified clinical prediction and recommendation workflow.
               </p>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

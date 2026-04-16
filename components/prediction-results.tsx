@@ -37,14 +37,14 @@ export default function PredictionResults({ prediction, symptoms }: PredictionRe
     ? Math.round(numericConfidencePercent) + "%"
     : "—"
   const predictedDisease =
-    topCondition?.predicted_disease || topCondition?.predictedDisease || topCondition?.prediction || "No result"
+    topCondition?.primary_concern ||
+    topCondition?.predictedDisease ||
+    "No result"
   const riskLevel = topCondition?.risk_level || topCondition?.riskLevel || "Unknown"
   const matchedSymptoms: number | undefined = topCondition?.matched_symptoms
   const usedSymptomsPath: boolean | undefined = topCondition?.used_symptoms_path
-  const clinicalRisk = topCondition?.clinical_risk || "Unknown"
-  const analysisMode = topCondition?.analysis_mode || "unknown"
+  const analysisMode = topCondition?.analysis_mode || "clinical_assessment"
   const inputSnapshot = topCondition?.input_snapshot || {}
-  const confidenceSource = topCondition?.confidence_source || "unknown"
   const uncertaintyLevel = topCondition?.uncertainty?.uncertainty_level || "Unknown"
   const symptomEvidence = topCondition?.symptom_evidence || {}
   const topK: Array<{ label: string; probability: number }> = Array.isArray(topCondition?.top_k)
@@ -85,11 +85,10 @@ export default function PredictionResults({ prediction, symptoms }: PredictionRe
           <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-lg p-6 mb-6 border border-slate-700">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-400 mb-1">Most Likely Disease</p>
+                <p className="text-sm font-medium text-slate-400 mb-1">Clinical Assessment</p>
                 <h3 className="text-3xl font-bold text-slate-100">{predictedDisease}</h3>
                 <p className="text-slate-300 mt-2">Confidence: {confidencePctText}</p>
                 <p className="text-slate-300 mt-1">Risk Level: {riskLevel}</p>
-                <p className="text-slate-300 mt-1">Clinical Risk: {clinicalRisk}</p>
               </div>
               <div className="text-right">
                 <div className="w-24 h-24 rounded-full bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center">
@@ -111,10 +110,6 @@ export default function PredictionResults({ prediction, symptoms }: PredictionRe
             )}
             <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
               <div className="rounded-md border border-slate-700 bg-slate-800 px-3 py-2">
-                <p className="text-xs text-slate-400">Confidence Source</p>
-                <p className="text-sm font-semibold text-slate-200">{String(confidenceSource).replaceAll("_", " ")}</p>
-              </div>
-              <div className="rounded-md border border-slate-700 bg-slate-800 px-3 py-2">
                 <p className="text-xs text-slate-400">Prediction Uncertainty</p>
                 <p className="text-sm font-semibold text-slate-200">{uncertaintyLevel}</p>
               </div>
@@ -129,7 +124,7 @@ export default function PredictionResults({ prediction, symptoms }: PredictionRe
               <p className="text-xs text-slate-400">Analysis Mode</p>
               <p className="text-sm font-semibold text-slate-200">{String(analysisMode).replaceAll("_", " ")}</p>
               <p className="text-xs text-slate-400 mt-1">
-                Data used: Symptoms, BP {bpKnown ? "provided" : "unknown"}, {" "}Glucose {glucoseKnown ? "provided" : "unknown"},
+                Data used: Symptoms + Metrics, BP {bpKnown ? "provided" : "unknown"}, {" "}Glucose {glucoseKnown ? "provided" : "unknown"},
                 {" "}Cholesterol {cholesterolKnown ? "provided" : "unknown"}
               </p>
             </div>
