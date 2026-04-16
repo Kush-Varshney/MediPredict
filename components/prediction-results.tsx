@@ -9,7 +9,7 @@ interface PredictionResultsProps {
 
 export default function PredictionResults({ prediction, symptoms }: PredictionResultsProps) {
   const topCondition = prediction
-  const rawSymptoms = Array.isArray(symptoms)  ? symptoms  : symptoms  ? [String(symptoms)]  : []
+  const rawSymptoms = Array.isArray(symptoms) ? symptoms : symptoms ? [String(symptoms)] : []
 
   if (!topCondition || typeof topCondition !== "object") {
     return (
@@ -59,12 +59,16 @@ export default function PredictionResults({ prediction, symptoms }: PredictionRe
   const glucoseKnown = inputSnapshot.glucose !== null && inputSnapshot.glucose !== undefined
   const cholesterolKnown = inputSnapshot.cholesterol !== null && inputSnapshot.cholesterol !== undefined
 
-  // 🔥 Filter out unmatched symptoms (MAIN FIX)
-  const unmatched = Array.isArray(symptomEvidence?.unmatched)
-    ? symptomEvidence.unmatched
-    : []
+  // Always show user-provided symptoms; unmatched ones are highlighted, not hidden.
+  const providedSymptoms = rawSymptoms
+    .map((s) => String(s).trim())
+    .filter((s) => s.length > 0)
 
-  const safeSymptoms = rawSymptoms.filter((s) => !unmatched.includes(s))
+  const unmatchedNormalized = new Set(
+    (Array.isArray(symptomEvidence?.unmatched) ? symptomEvidence.unmatched : [])
+      .map((s: unknown) => String(s).trim().toLowerCase())
+      .filter((s: string) => s.length > 0),
+  )
 
   return (
     <Card className="bg-slate-900/70 shadow-lg border-slate-700 mb-6">
@@ -135,21 +139,33 @@ export default function PredictionResults({ prediction, symptoms }: PredictionRe
         <div className="mt-4">
           <h3 className="text-lg font-semibold text-slate-100 mb-2">Provided Symptoms</h3>
 
-          {safeSymptoms.length === 0 ? (
+          {providedSymptoms.length === 0 ? (
             <p className="text-sm text-slate-400">
               No valid symptoms selected.
             </p>
           ) : (
             <div className="flex flex-wrap gap-2">
-              {safeSymptoms.map((s) => (
+              {providedSymptoms.map((s) => {
+                const isUnmatched = unmatchedNormalized.has(s.toLowerCase())
+                return (
                 <span
                   key={s}
-                  className="bg-slate-800 border border-slate-700 px-2 py-1 rounded text-sm text-slate-200"
+                  className={`px-2 py-1 rounded text-sm ${
+                    isUnmatched
+                      ? "bg-amber-500/10 border border-amber-500/30 text-amber-100"
+                      : "bg-slate-800 border border-slate-700 text-slate-200"
+                  }`}
                 >
                   {s}
                 </span>
-              ))}
+                )
+              })}
             </div>
+          )}
+          {providedSymptoms.length > 0 && unmatchedNormalized.size > 0 && (
+            <p className="text-xs text-slate-400 mt-2">
+              Amber symptoms were provided but not recognized by the symptom vocabulary.
+            </p>
           )}
         </div>
 

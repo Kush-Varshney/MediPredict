@@ -16,49 +16,133 @@ function withTimeout(promise, timeoutMs = 10000) {
 }
 
 const apiKey = process.env.GEMINI_API_KEY
-const preferredModel = process.env.GEMINI_MODEL || "gemini-2.5-flash"
 let genAI = null
 if (apiKey && apiKey.trim()) {
   genAI = new GoogleGenerativeAI(apiKey)
 }
 
-// Resolve a working model once per process
-let resolvedModel = null
+function normalizeModelName(name) {
+  const raw = (name || "").trim()
+  if (!raw) return ""
+  // The REST API lists names like "models/gemini-2.0-flash". The SDK expects just "gemini-2.0-flash".
+  return raw.startsWith("models/") ? raw.slice("models/".length) : raw
+}
+
+function isTransientGeminiError(err) {
+  const msg = String(err?.message || err || "")
+  return (
+    msg.includes("[503") ||
+    msg.includes("503") ||
+    msg.toLowerCase().includes("service unavailable") ||
+    msg.toLowerCase().includes("high demand") ||
+    msg.includes("[429") ||
+    msg.includes("429") ||
+    msg.toLowerCase().includes("resource exhausted") ||
+    msg.toLowerCase().includes("rate limit")
+  )
+}
+
+async function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms))
+}
+
+function getCandidateModelNames() {
+  // Keep this list aligned with what the API key can actually access.
+  // Prefer "lite" + "latest" aliases for stability on free tier.
+  return [
+    process.env.GEMINI_MODEL,
+    "gemini-flash-lite-latest",
+    "gemini-2.0-flash-lite",
+    "gemini-2.0-flash-lite-001",
+    "gemini-flash-latest",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-001",
+    // Higher demand; keep last as best-effort
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-pro-latest",
+    "gemini-2.5-pro",
+  ]
+    .map((n) => normalizeModelName(n))
+    .filter((n, idx, arr) => n && arr.indexOf(n) === idx)
+}
+
+function getModel(name) {
+  return genAI.getGenerativeModel({
+    model: name,
+    generationConfig: {
+      // Strongly nudges the API toward strict JSON output.
+      // If unsupported for a model, the SDK will error and we'll fall back.
+      responseMimeType: "application/json",
+      temperature: 0.2,
+    },
+  })
+}
+
+// Resolve a working model (cached, but auto-recovers on errors)
+let resolvedModelName = null
 async function resolveModel() {
   if (!genAI) throw new Error("GEMINI_API_KEY is not configured")
-  if (resolvedModel) return resolvedModel
+  if (resolvedModelName) return resolvedModelName
 
-  if (process.env.GEMINI_MODEL && process.env.GEMINI_MODEL.trim()) {
-    const name = process.env.GEMINI_MODEL.trim()
-    try {
-      const model = genAI.getGenerativeModel({ model: name })
-      const probe = await withTimeout(model.generateContent("OK"), 5000)
-      if (probe.response?.text()) {
-        resolvedModel = model
-        return resolvedModel
-      }
-    } catch (err) {
-      console.warn(`Model ${name} not available:`, err.message)
-    }
-  }
-
-  const candidates = ["gemini-2.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-flash"]
-
-  let lastErr
+  const candidates = getCandidateModelNames()
+  let lastErr = null
   for (const name of candidates) {
     try {
-      const model = genAI.getGenerativeModel({ model: name })
-      const probe = await withTimeout(model.generateContent("OK"), 5000)
-      if (probe.response?.text()) {
-        resolvedModel = model
-        return resolvedModel
+      const model = getModel(name)
+      const probe = await withTimeout(model.generateContent("OK"), 7000)
+      const txt = probe?.response?.text?.() || ""
+      if (txt && txt.trim().length > 0) {
+        resolvedModelName = name
+        return resolvedModelName
       }
     } catch (err) {
       lastErr = err
-      continue
     }
   }
   throw lastErr || new Error("No compatible Gemini model found")
+}
+
+async function generateWithFallback(prompt, { timeoutMs = 15000 } = {}) {
+  if (!genAI) throw new Error("GEMINI_API_KEY is not configured")
+
+  const candidates = getCandidateModelNames()
+  // If we previously resolved a model, try it first.
+  const primary = resolvedModelName ? [resolvedModelName] : []
+  const ordered = [...primary, ...candidates.filter((m) => m !== resolvedModelName)]
+
+  let lastErr = null
+  for (const name of ordered) {
+    const model = getModel(name)
+
+    // Up to 3 attempts on transient errors for this model.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const result = await withTimeout(model.generateContent(prompt), timeoutMs)
+        const response = await result.response
+        const text = response.text()
+        if (!text || text.trim().length === 0) throw new Error("Empty response from Gemini")
+        resolvedModelName = name
+        return text
+      } catch (err) {
+        lastErr = err
+        // 404/400 means the model name or config isn't supported; try next model.
+        const msg = String(err?.message || err || "")
+        const isNotFound = msg.includes("[404") || msg.includes("404")
+        const isBadRequest = msg.includes("[400") || msg.includes("400")
+        if (isNotFound || isBadRequest) break
+
+        if (!isTransientGeminiError(err)) break
+        // Exponential backoff with jitter
+        const backoffMs = Math.min(2000 * 2 ** attempt + Math.floor(Math.random() * 250), 6000)
+        await sleep(backoffMs)
+      }
+    }
+  }
+
+  // If our cached model is failing, clear it for next request.
+  resolvedModelName = null
+  throw lastErr || new Error("Gemini generation failed")
 }
 
 async function callGeminiAPI(disease, healthData) {
@@ -66,8 +150,6 @@ async function callGeminiAPI(disease, healthData) {
     if (!genAI) {
       throw new Error("GEMINI_API_KEY is not configured - set it in environment variables")
     }
-
-    const model = await resolveModel()
 
     const prompt = `You are a medical AI assistant. Based on the disease "${disease}" and the following health data:
 - Age: ${healthData.age}
@@ -85,9 +167,7 @@ Please provide:
 Format your response as a JSON object with keys: "explanation", "precautions" (array of strings), "diet" (array of strings).
 Only return the JSON object, no additional text.`
 
-    const result = await withTimeout(model.generateContent(prompt), 15000)
-    const response = await result.response
-    const text = response.text()
+    const text = await generateWithFallback(prompt, { timeoutMs: 20000 })
 
     if (!text || text.trim().length === 0) {
       throw new Error("Empty response from Gemini")
@@ -150,8 +230,6 @@ async function analyzeSymptomsWithGemini(healthData) {
     if (!genAI) {
       throw new Error("GEMINI_API_KEY is not configured");
     }
-
-    const model = await resolveModel();
     
     // Normalize gender for prompt
     const genderStr = healthData.gender === 1 || healthData.gender === 'M' ? 'Male' : 
@@ -184,9 +262,7 @@ Response Format (JSON ONLY):
   "diet": ["diet recommendation 1", ...]
 }`;
 
-    const result = await withTimeout(model.generateContent(prompt), 15000);
-    const response = await result.response;
-    const text = response.text();
+    const text = await generateWithFallback(prompt, { timeoutMs: 20000 })
     
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("Could not parse JSON from Gemini analysis");

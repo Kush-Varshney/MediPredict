@@ -399,6 +399,7 @@ JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
 JWT_EXPIRE=7d
 ML_SERVICE_URL=http://127.0.0.1:5001
 GEMINI_API_KEY=your-google-gemini-api-key
+GEMINI_MODEL=gemini-flash-lite-latest
 ```
 
 #### ML Service Environment Variables
